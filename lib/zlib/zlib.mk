@@ -7,7 +7,7 @@
 ZLIB_PATH	:=	lib/zlib
 
 # Imported from zlib 1.2.11 (do not modify them)
-ZLIB_SOURCES	:=	$(addprefix $(ZLIB_PATH)/,	\
+ZLIB_SOURCES	:=	$(addprefix $(ZLIB_PATH)/zlib/,	\
 					adler32.c	\
 					crc32.c		\
 					inffast.c	\
