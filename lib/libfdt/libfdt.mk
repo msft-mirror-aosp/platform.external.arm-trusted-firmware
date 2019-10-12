@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-LIBFDT_SRCS	:=	$(addprefix lib/libfdt/,	\
+LIBFDT_SRCS	:=	$(addprefix lib/libfdt/libfdt/,	\
 			fdt.c				\
 			fdt_addresses.c			\
 			fdt_empty_tree.c		\
@@ -14,6 +14,6 @@ LIBFDT_SRCS	:=	$(addprefix lib/libfdt/,	\
 			fdt_sw.c			\
 			fdt_wip.c)			\
 
-INCLUDES	+=	-Iinclude/lib/libfdt
+INCLUDES	+=	-Ilib/libfdt/libfdt
 
 $(eval $(call MAKE_LIB,fdt))
