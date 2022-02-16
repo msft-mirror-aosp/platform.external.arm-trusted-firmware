@@ -493,6 +493,9 @@ void plat_ea_handler(unsigned int ea_reason, uint64_t syndrome, void *cookie,
 #if RAS_EXTENSION
 	tegra194_ea_handler(ea_reason, syndrome, cookie, handle, flags);
 #else
-	plat_default_ea_handler(ea_reason, syndrome, cookie, handle, flags);
+	ERROR("Unhandled External Abort received on 0x%llx at EL3!\n",
+			read_mpidr_el1());
+	ERROR(" exception reason=%u syndrome=0x%lx\n", ea_reason, syndrome);
+	panic();
 #endif
 }

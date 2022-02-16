@@ -12,21 +12,24 @@ Running software on Juno
 
 This version of TF-A has been tested on variants r0, r1 and r2 of Juno.
 
-To run TF-A on Juno, you need to first prepare an SD card with Juno software
-stack that includes TF-A. This version of TF-A is tested with pre-built
-`Linaro release software stack`_ version 20.01. You can alternatively
-build the software stack yourself by following the
-`Juno platform software user guide`_. Once you prepare the software stack
-on an SD card, you can replace the ``bl1.bin`` and ``fip.bin``
-binaries in the ``SOFTWARE/`` directory with custom built TF-A binaries.
+To execute the software stack on Juno, the version of the Juno board recovery
+image indicated in the `Linaro Release Notes`_ must be installed. If you have an
+earlier version installed or are unsure which version is installed, please
+re-install the recovery image by following the
+`Instructions for using Linaro's deliverables on Juno`_.
 
 Preparing TF-A images
 ---------------------
 
+After building TF-A, the files ``bl1.bin`` and ``fip.bin`` need copying to the
+``SOFTWARE/`` directory of the Juno SD card.
+
+Creating a Firmware Image Package (FIP)
+---------------------------------------
+
 This section provides Juno and FVP specific instructions to build Trusted
 Firmware, obtain the additional required firmware, and pack it all together in
-a single FIP binary. It assumes that a Linaro release software stack has been
-installed.
+a single FIP binary. It assumes that a Linaro release has been installed.
 
 .. note::
    Pre-built binaries for AArch32 are available from Linaro Release 16.12
@@ -54,16 +57,9 @@ installed.
 
        make realclean
 
-#. Obtain SCP binaries (Juno)
+#. Obtain SCP_BL2 (Juno) and BL33 (all platforms)
 
-   This version of TF-A is tested with SCP version 2.8.0 on Juno. You can
-   download pre-built SCP binaries (``scp_bl1.bin`` and ``scp_bl2.bin``)
-   from `TF-A downloads page`_. Alternatively, you can `build
-   the binaries from source`_.
-
-#. Obtain BL33 (all platforms)
-
-   Use the fiptool to extract the BL33 image from the FIP
+   Use the fiptool to extract the SCP_BL2 and BL33 images from the FIP
    package included in the Linaro release:
 
    .. code:: shell
@@ -75,7 +71,8 @@ installed.
        ./tools/fiptool/fiptool unpack <path-to-linaro-release>/[SOFTWARE]/fip.bin
 
    The unpack operation will result in a set of binary images extracted to the
-   current working directory. BL33 corresponds to ``nt-fw.bin``.
+   current working directory. The SCP_BL2 image corresponds to
+   ``scp-fw.bin`` and BL33 corresponds to ``nt-fw.bin``.
 
    .. note::
       The fiptool will complain if the images to be unpacked already
@@ -105,7 +102,7 @@ installed.
 
    .. code:: shell
 
-       make PLAT=juno BL33=nt-fw.bin SCP_BL2=scp_bl2.bin all fip
+       make PLAT=juno BL33=nt-fw.bin SCP_BL2=scp-fw.bin all fip
 
    For AArch32:
 
@@ -147,7 +144,7 @@ installed.
       .. code:: shell
 
           make ARCH=aarch64 PLAT=juno JUNO_AARCH32_EL3_RUNTIME=1 \
-          BL33=nt-fw.bin SCP_BL2=scp_bl2.bin \
+          BL33=nt-fw.bin SCP_BL2=scp-fw.bin \
           BL32=<path-to-temporary>/bl32.bin all fip
 
 The resulting BL1 and FIP images may be found in:
@@ -162,8 +159,6 @@ The resulting BL1 and FIP images may be found in:
     ./build/fvp/release/bl1.bin
     ./build/fvp/release/fip.bin
 
-After building TF-A, the files ``bl1.bin``, ``fip.bin`` and ``scp_bl1.bin``
-need to be copied to the ``SOFTWARE/`` directory on the Juno SD card.
 
 Booting Firmware Update images
 ------------------------------
@@ -241,12 +236,10 @@ configure it.
 
 --------------
 
-*Copyright (c) 2019-2021, Arm Limited. All rights reserved.*
+*Copyright (c) 2019, Arm Limited. All rights reserved.*
 
-.. _Linaro release software stack: http://releases.linaro.org/members/arm/platforms/
-.. _Juno platform software user guide: https://git.linaro.org/landing-teams/working/arm/arm-reference-platforms.git/about/docs/juno/user-guide.rst
-.. _TF-A downloads page: https://downloads.trustedfirmware.org/tf-a/css_scp_2.8.0/juno/
-.. _build the binaries from source: https://github.com/ARM-software/SCP-firmware/blob/master/user_guide.md#scp-firmware-user-guide
+.. _Linaro Release Notes: https://community.arm.com/dev-platforms/w/docs/226/old-release-notes
+.. _Instructions for using Linaro's deliverables on Juno: https://community.arm.com/dev-platforms/w/docs/303/juno
 .. _Arm Platforms Portal: https://community.arm.com/dev-platforms/
 .. _Juno Getting Started Guide: http://infocenter.arm.com/help/topic/com.arm.doc.dui0928e/DUI0928E_juno_arm_development_platform_gsg.pdf
 .. _PSCI: http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
