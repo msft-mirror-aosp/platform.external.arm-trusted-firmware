@@ -7,14 +7,15 @@
 #include <arch_helpers.h>
 #include <common/debug.h>
 #include <lib/utils.h>
-#include <plat/common/plat_trng.h>
 #include <platform_def.h>
+
+#include "juno_decl.h"
 
 u_register_t plat_get_stack_protector_canary(void)
 {
 	uint64_t entropy;
 
-	if (!plat_get_entropy(&entropy)) {
+	if (!juno_getentropy(&entropy)) {
 		ERROR("Not enough entropy to initialize canary value\n");
 		panic();
 	}
