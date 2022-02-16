@@ -62,159 +62,150 @@ static const struct {
 } zynqmp_devices[] = {
 	{
 		.id = 0x10,
-		.name = "XCZU3EG",
+		.name = "3EG",
 	},
 	{
 		.id = 0x10,
 		.ver = 0x2c,
-		.name = "XCZU3CG",
+		.name = "3CG",
 	},
 	{
 		.id = 0x11,
-		.name = "XCZU2EG",
+		.name = "2EG",
 	},
 	{
 		.id = 0x11,
 		.ver = 0x2c,
-		.name = "XCZU2CG",
+		.name = "2CG",
 	},
 	{
 		.id = 0x20,
-		.name = "XCZU5EV",
+		.name = "5EV",
 		.evexists = true,
 	},
 	{
 		.id = 0x20,
 		.ver = 0x100,
-		.name = "XCZU5EG",
+		.name = "5EG",
 		.evexists = true,
 	},
 	{
 		.id = 0x20,
 		.ver = 0x12c,
-		.name = "XCZU5CG",
+		.name = "5CG",
 	},
 	{
 		.id = 0x21,
-		.name = "XCZU4EV",
+		.name = "4EV",
 		.evexists = true,
 	},
 	{
 		.id = 0x21,
 		.ver = 0x100,
-		.name = "XCZU4EG",
+		.name = "4EG",
 		.evexists = true,
 	},
 	{
 		.id = 0x21,
 		.ver = 0x12c,
-		.name = "XCZU4CG",
+		.name = "4CG",
 	},
 	{
 		.id = 0x30,
-		.name = "XCZU7EV",
+		.name = "7EV",
 		.evexists = true,
 	},
 	{
 		.id = 0x30,
 		.ver = 0x100,
-		.name = "XCZU7EG",
+		.name = "7EG",
 		.evexists = true,
 	},
 	{
 		.id = 0x30,
 		.ver = 0x12c,
-		.name = "XCZU7CG",
+		.name = "7CG",
 	},
 	{
 		.id = 0x38,
-		.name = "XCZU9EG",
+		.name = "9EG",
 	},
 	{
 		.id = 0x38,
 		.ver = 0x2c,
-		.name = "XCZU9CG",
+		.name = "9CG",
 	},
 	{
 		.id = 0x39,
-		.name = "XCZU6EG",
+		.name = "6EG",
 	},
 	{
 		.id = 0x39,
 		.ver = 0x2c,
-		.name = "XCZU6CG",
+		.name = "6CG",
 	},
 	{
 		.id = 0x40,
-		.name = "XCZU11EG",
+		.name = "11EG",
+	},
+	{ /* For testing purpose only */
+		.id = 0x50,
+		.ver = 0x2c,
+		.name = "15CG",
 	},
 	{
 		.id = 0x50,
-		.name = "XCZU15EG",
+		.name = "15EG",
 	},
 	{
 		.id = 0x58,
-		.name = "XCZU19EG",
+		.name = "19EG",
 	},
 	{
 		.id = 0x59,
-		.name = "XCZU17EG",
+		.name = "17EG",
 	},
 	{
 		.id = 0x60,
-		.name = "XCZU28DR",
+		.name = "28DR",
 	},
 	{
 		.id = 0x61,
-		.name = "XCZU21DR",
+		.name = "21DR",
 	},
 	{
 		.id = 0x62,
-		.name = "XCZU29DR",
+		.name = "29DR",
 	},
 	{
 		.id = 0x63,
-		.name = "XCZU23DR",
+		.name = "23DR",
 	},
 	{
 		.id = 0x64,
-		.name = "XCZU27DR",
+		.name = "27DR",
 	},
 	{
 		.id = 0x65,
-		.name = "XCZU25DR",
+		.name = "25DR",
 	},
 	{
 		.id = 0x66,
-		.name = "XCZU39DR",
-	},
-	{
-		.id = 0x7d,
-		.name = "XCZU43DR",
-	},
-	{
-		.id = 0x78,
-		.name = "XCZU46DR",
-	},
-	{
-		.id = 0x7f,
-		.name = "XCZU47DR",
+		.name = "39DR",
 	},
 	{
 		.id = 0x7b,
-		.name = "XCZU48DR",
+		.name = "48DR",
 	},
 	{
 		.id = 0x7e,
-		.name = "XCZU49DR",
+		.name = "49DR",
 	},
 };
 
 #define ZYNQMP_PL_STATUS_BIT	9
 #define ZYNQMP_PL_STATUS_MASK	BIT(ZYNQMP_PL_STATUS_BIT)
 #define ZYNQMP_CSU_VERSION_MASK	~(ZYNQMP_PL_STATUS_MASK)
-
-#define SILICON_ID_XCK26       0x4724093
 
 static char *zynqmp_get_silicon_idcode_name(void)
 {
@@ -233,7 +224,7 @@ static char *zynqmp_get_silicon_idcode_name(void)
 	chipid[1] = mmio_read_32(EFUSE_BASEADDR + EFUSE_IPDISABLE_OFFSET);
 #else
 	if (pm_get_chipid(chipid) != PM_RET_SUCCESS)
-		return "XCZUUNKN";
+		return "UNKN";
 #endif
 
 	id = chipid[0] & (ZYNQMP_CSU_IDCODE_DEVICE_CODE_MASK |
@@ -247,13 +238,8 @@ static char *zynqmp_get_silicon_idcode_name(void)
 			break;
 	}
 
-	if (i >= ARRAY_SIZE(zynqmp_devices)) {
-		if (chipid[0] == SILICON_ID_XCK26) {
-			return "XCK26";
-		} else {
-			return "XCZUUNKN";
-		}
-	}
+	if (i >= ARRAY_SIZE(zynqmp_devices))
+		return "UNKN";
 
 	if (!zynqmp_devices[i].evexists)
 		return zynqmp_devices[i].name;
@@ -329,10 +315,9 @@ static void zynqmp_print_platform_name(void)
 		break;
 	}
 
-	NOTICE("TF-A running on %s/%s at 0x%x\n",
-	       zynqmp_print_silicon_idcode(), label, BL31_BASE);
-	VERBOSE("TF-A running on v%d/RTL%d.%d\n",
-	       zynqmp_get_ps_ver(), (rtl & 0xf0) >> 4, rtl & 0xf);
+	NOTICE("ATF running on XCZU%s/%s v%d/RTL%d.%d at 0x%x\n",
+	       zynqmp_print_silicon_idcode(), label, zynqmp_get_ps_ver(),
+	       (rtl & 0xf0) >> 4, rtl & 0xf, BL31_BASE);
 }
 #else
 static inline void zynqmp_print_platform_name(void) { }
@@ -353,19 +338,10 @@ unsigned int zynqmp_get_bootmode(void)
 
 void zynqmp_config_setup(void)
 {
-	uint64_t counter_freq;
-
 	/* Configure IPI data for ZynqMP */
 	zynqmp_ipi_config_table_init();
 
 	zynqmp_print_platform_name();
-
-	/* Configure counter frequency */
-	counter_freq = read_cntfrq_el0();
-	if (counter_freq == ZYNQMP_DEFAULT_COUNTER_FREQ) {
-		write_cntfrq_el0(plat_get_syscnt_freq2());
-	}
-
 	generic_delay_timer_init();
 }
 
