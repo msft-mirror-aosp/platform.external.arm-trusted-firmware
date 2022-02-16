@@ -10,6 +10,10 @@
 #include <common/asm_macros_common.S>
 #include <lib/spinlock.h>
 
+#if ENABLE_BTI && !ARM_ARCH_AT_LEAST(8, 5)
+#error Branch Target Identification requires ARM_ARCH_MINOR >= 5
+#endif
+
 /*
  * TLBI instruction with type specifier that implements the workaround for
  * errata 813419 of Cortex-A57 or errata 1286807 of Cortex-A76.
@@ -215,12 +219,12 @@
 	.endm
 
 	/*
-	 * Macro for mitigating against speculative execution beyond ERET. Uses the
-	 * speculation barrier instruction introduced by FEAT_SB, if it's enabled.
+	 * Macro for mitigating against speculative execution beyond ERET.
+	 * If possible use Speculation Barrier instruction defined in ARMv8.5
 	 */
 	.macro exception_return
 	eret
-#if ENABLE_FEAT_SB
+#if ARM_ARCH_AT_LEAST(8, 5)
 	sb
 #else
 	dsb	nsh

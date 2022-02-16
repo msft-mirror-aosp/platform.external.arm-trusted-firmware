@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -86,7 +86,11 @@ $(eval $(call assert_boolean,ARM_LINUX_KERNEL_AS_BL33))
 $(eval $(call add_define,ARM_LINUX_KERNEL_AS_BL33))
 
 ifeq (${ARM_LINUX_KERNEL_AS_BL33},1)
-  ifneq (${ARCH},aarch64)
+  ifeq (${ARCH},aarch64)
+    ifneq (${RESET_TO_BL31},1)
+      $(error "ARM_LINUX_KERNEL_AS_BL33 is only available if RESET_TO_BL31=1.")
+    endif
+  else
     ifneq (${RESET_TO_SP_MIN},1)
       $(error "ARM_LINUX_KERNEL_AS_BL33 is only available if RESET_TO_SP_MIN=1.")
     endif
@@ -99,11 +103,6 @@ ifeq (${ARM_LINUX_KERNEL_AS_BL33},1)
   endif
   $(eval $(call add_define,ARM_PRELOADED_DTB_BASE))
 endif
-
-# Arm Ethos-N NPU SiP service
-ARM_ETHOSN_NPU_DRIVER			:=	0
-$(eval $(call assert_boolean,ARM_ETHOSN_NPU_DRIVER))
-$(eval $(call add_define,ARM_ETHOSN_NPU_DRIVER))
 
 # Use an implementation of SHA-256 with a smaller memory footprint but reduced
 # speed.
@@ -154,9 +153,9 @@ ARM_CRYPTOCELL_INTEG		:=	0
 $(eval $(call assert_boolean,ARM_CRYPTOCELL_INTEG))
 $(eval $(call add_define,ARM_CRYPTOCELL_INTEG))
 
-# Enable PIE support for RESET_TO_BL31/RESET_TO_SP_MIN case
-ifneq ($(filter 1,${RESET_TO_BL31} ${RESET_TO_SP_MIN}),)
-	ENABLE_PIE			:=	1
+# Enable PIE support for RESET_TO_BL31 case
+ifeq (${RESET_TO_BL31},1)
+    ENABLE_PIE			:=	1
 endif
 
 # CryptoCell integration relies on coherent buffers for passing data from
@@ -165,36 +164,6 @@ ifeq (${ARM_CRYPTOCELL_INTEG},1)
     ifeq (${USE_COHERENT_MEM},0)
         $(error "ARM_CRYPTOCELL_INTEG needs USE_COHERENT_MEM to be set.")
     endif
-endif
-
-# Disable GPT parser support, use FIP image by default
-ARM_GPT_SUPPORT			:=	0
-$(eval $(call assert_boolean,ARM_GPT_SUPPORT))
-$(eval $(call add_define,ARM_GPT_SUPPORT))
-
-# Include necessary sources to parse GPT image
-ifeq (${ARM_GPT_SUPPORT}, 1)
-  BL2_SOURCES	+=	drivers/partition/gpt.c		\
-			drivers/partition/partition.c
-endif
-
-# Enable CRC instructions via extension for ARMv8-A CPUs.
-# For ARMv8.1-A, and onwards CRC instructions are default enabled.
-# Enable HW computed CRC support unconditionally in BL2 component.
-ifeq (${ARM_ARCH_MINOR},0)
-  BL2_CPPFLAGS += -march=armv8-a+crc
-endif
-
-ifeq ($(PSA_FWU_SUPPORT),1)
-    # GPT support is recommended as per PSA FWU specification hence
-    # PSA FWU implementation is tightly coupled with GPT support,
-    # and it does not support other formats.
-    ifneq ($(ARM_GPT_SUPPORT),1)
-      $(error For PSA_FWU_SUPPORT, ARM_GPT_SUPPORT must be enabled)
-    endif
-    FWU_MK := drivers/fwu/fwu.mk
-    $(info Including ${FWU_MK})
-    include ${FWU_MK}
 endif
 
 ifeq (${ARCH}, aarch64)
@@ -242,7 +211,6 @@ BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c		\
 				drivers/io/io_storage.c				\
 				plat/arm/common/arm_bl2_setup.c			\
 				plat/arm/common/arm_err.c			\
-				common/tf_crc32.c				\
 				${ARM_IO_SOURCES}
 
 # Firmware Configuration Framework sources
@@ -253,8 +221,7 @@ include lib/libfdt/libfdt.mk
 
 DYN_CFG_SOURCES		+=	plat/arm/common/arm_dyn_cfg.c		\
 				plat/arm/common/arm_dyn_cfg_helpers.c	\
-				common/fdt_wrappers.c			\
-				common/uuid.c
+				common/fdt_wrappers.c
 
 BL1_SOURCES		+=	${DYN_CFG_SOURCES}
 BL2_SOURCES		+=	${DYN_CFG_SOURCES}
@@ -268,9 +235,7 @@ endif
 ifeq (${JUNO_AARCH32_EL3_RUNTIME},1)
 BL2_SOURCES		+=	plat/arm/common/aarch32/arm_bl2_mem_params_desc.c
 else
-ifeq ($(filter ${TARGET_PLATFORM}, fpga fvp),)
 BL2_SOURCES		+=	plat/arm/common/${ARCH}/arm_bl2_mem_params_desc.c
-endif
 endif
 BL2_SOURCES		+=	plat/arm/common/arm_image_load.c		\
 				common/desc_image_load.c
@@ -287,26 +252,14 @@ BL31_SOURCES		+=	plat/arm/common/arm_bl31_setup.c		\
 				plat/arm/common/arm_topology.c			\
 				plat/common/plat_psci_common.c
 
-ifneq ($(filter 1,${ENABLE_PMF} ${ARM_ETHOSN_NPU_DRIVER}),)
-ARM_SVC_HANDLER_SRCS :=
-
-ifeq (${ENABLE_PMF},1)
-ARM_SVC_HANDLER_SRCS	+=	lib/pmf/pmf_smc.c
-endif
-
-ifeq (${ARM_ETHOSN_NPU_DRIVER},1)
-ARM_SVC_HANDLER_SRCS	+=	plat/arm/common/fconf/fconf_ethosn_getter.c	\
-				drivers/delay_timer/delay_timer.c		\
-				drivers/arm/ethosn/ethosn_smc.c
-endif
-
+ifeq (${ENABLE_PMF}, 1)
 ifeq (${ARCH}, aarch64)
 BL31_SOURCES		+=	plat/arm/common/aarch64/execution_state_switch.c\
 				plat/arm/common/arm_sip_svc.c			\
-				${ARM_SVC_HANDLER_SRCS}
+				lib/pmf/pmf_smc.c
 else
 BL32_SOURCES		+=	plat/arm/common/arm_sip_svc.c			\
-				${ARM_SVC_HANDLER_SRCS}
+				lib/pmf/pmf_smc.c
 endif
 endif
 
@@ -336,7 +289,6 @@ endif
 ifeq (${SPD},spmd)
 BL31_SOURCES		+=	plat/common/plat_spmd_manifest.c	\
 				common/fdt_wrappers.c			\
-				common/uuid.c				\
 				${LIBFDT_SRCS}
 
 endif

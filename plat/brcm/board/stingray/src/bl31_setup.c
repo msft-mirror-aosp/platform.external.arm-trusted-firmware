@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 - 2021, Broadcom
+ * Copyright (c) 2015 - 2020, Broadcom
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -28,9 +28,6 @@
 #include <paxb.h>
 #include <paxc.h>
 #include <platform_def.h>
-#ifdef USE_USB
-#include <platform_usb.h>
-#endif
 #include <sdio.h>
 #include <sr_utils.h>
 #include <timer_sync.h>
