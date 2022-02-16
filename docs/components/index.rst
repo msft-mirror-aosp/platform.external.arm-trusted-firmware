@@ -19,6 +19,6 @@ Components
    sdei
    secure-partition-manager
    secure-partition-manager-mm
-   ffa-manifest-binding
+   psa-ffa-manifest-binding
    xlat-tables-lib-v2-design
    cot-binding

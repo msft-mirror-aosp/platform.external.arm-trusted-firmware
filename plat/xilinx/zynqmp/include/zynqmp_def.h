@@ -17,9 +17,6 @@
 
 #define ZYNQMP_CONSOLE_IS(con)	(ZYNQMP_CONSOLE_ID_ ## con == ZYNQMP_CONSOLE)
 
-/* Default counter frequency */
-#define ZYNQMP_DEFAULT_COUNTER_FREQ	0U
-
 /* Firmware Image Package */
 #define ZYNQMP_PRIMARY_CPU		0
 
