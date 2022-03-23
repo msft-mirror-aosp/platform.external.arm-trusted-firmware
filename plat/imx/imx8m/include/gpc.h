@@ -32,7 +32,7 @@
 		.pwr_req = name##_PWR_REQ,		\
 		.pgc_offset = name##_PGC,		\
 		.need_sync = false,			\
-		.always_on = (on),			\
+		.always_on = true,			\
 	}
 
 #define IMX_MIX_DOMAIN(name, on)			\
@@ -42,7 +42,7 @@
 		.adb400_sync = name##_ADB400_SYNC,	\
 		.adb400_ack = name##_ADB400_ACK,	\
 		.need_sync = true,			\
-		.always_on = (on),			\
+		.always_on = true,			\
 	}
 
 struct imx_pwr_domain {
