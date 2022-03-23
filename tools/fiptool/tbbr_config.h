@@ -21,8 +21,4 @@ typedef struct toc_entry {
 
 extern toc_entry_t toc_entries[];
 
-#ifdef PLAT_DEF_FIP_UUID
-extern toc_entry_t plat_def_toc_entries[];
-#endif
-
 #endif /* TBBR_CONFIG_H */

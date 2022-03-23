@@ -8,7 +8,7 @@
 # Trusted Firmware Version
 #
 VERSION_MAJOR			:= 2
-VERSION_MINOR			:= 5
+VERSION_MINOR			:= 4
 
 # Default goal is build all images
 .DEFAULT_GOAL			:= all
@@ -245,13 +245,6 @@ endif	# arch-features
 # Determine if FEAT_RNG is supported
 ENABLE_FEAT_RNG		=	$(if $(findstring rng,${arch-features}),1,0)
 
-# Determine if FEAT_SB is supported
-ENABLE_FEAT_SB		=	$(if $(findstring sb,${arch-features}),1,0)
-
-ifeq "8.5" "$(word 1, $(sort 8.5 $(ARM_ARCH_MAJOR).$(ARM_ARCH_MINOR)))"
-ENABLE_FEAT_SB		= 	1
-endif
-
 ifneq ($(findstring armclang,$(notdir $(CC))),)
 TF_CFLAGS_aarch32	=	-target arm-arm-none-eabi $(march32-directive)
 TF_CFLAGS_aarch64	=	-target aarch64-arm-none-eabi $(march64-directive)
@@ -334,7 +327,7 @@ ASFLAGS_aarch64		=	$(march64-directive)
 
 # General warnings
 WARNINGS		:=	-Wall -Wmissing-include-dirs -Wunused	\
-				-Wdisabled-optimization -Wvla -Wshadow	\
+				-Wdisabled-optimization	-Wvla -Wshadow	\
 				-Wno-unused-parameter -Wredundant-decls
 
 # Additional warnings
@@ -521,10 +514,6 @@ ifneq (${SPD},none)
         ifeq ($(findstring optee_sp,$(ARM_SPMC_MANIFEST_DTS)),optee_sp)
             DTC_CPPFLAGS	+=	-DOPTEE_SP_FW_CONFIG
         endif
-
-        ifeq ($(TS_SP_FW_CONFIG),1)
-            DTC_CPPFLAGS	+=	-DTS_SP_FW_CONFIG
-        endif
     else
         # All other SPDs in spd directory
         SPD_DIR := spd
@@ -583,8 +572,10 @@ endif
 endif
 	BL31_CFLAGS	+=	-fpie
 	BL31_LDFLAGS	+=	$(PIE_LDFLAGS)
+ifeq ($(ARCH),aarch64)
 	BL32_CFLAGS	+=	-fpie
 	BL32_LDFLAGS	+=	$(PIE_LDFLAGS)
+endif
 endif
 
 ifeq (${ARCH},aarch64)
@@ -735,19 +726,12 @@ ifeq ($(CTX_INCLUDE_MTE_REGS),1)
     endif
 endif
 
-# Trusted Boot is a prerequisite for Measured Boot. It provides trust that the
-# code taking the measurements and recording them has not been tampered
-# with. This is referred to as the Root of Trust for Measurement.
 ifeq ($(MEASURED_BOOT),1)
     ifneq (${TRUSTED_BOARD_BOOT},1)
         $(error MEASURED_BOOT requires TRUSTED_BOARD_BOOT=1)
     else
         $(info MEASURED_BOOT is an experimental feature)
     endif
-endif
-
-ifeq ($(PSA_FWU_SUPPORT),1)
-    $(info PSA_FWU_SUPPORT is an experimental feature)
 endif
 
 ifeq (${ARM_XLAT_TABLES_LIB_V1}, 1)
@@ -911,7 +895,6 @@ $(eval $(call assert_booleans,\
         DYN_DISABLE_AUTH \
         EL3_EXCEPTION_HANDLING \
         ENABLE_AMU \
-        AMU_RESTRICT_COUNTERS \
         ENABLE_ASSERTIONS \
         ENABLE_MPAM_FOR_LOWER_ELS \
         ENABLE_PIE \
@@ -920,7 +903,6 @@ $(eval $(call assert_booleans,\
         ENABLE_RUNTIME_INSTRUMENTATION \
         ENABLE_SPE_FOR_LOWER_ELS \
         ENABLE_SVE_FOR_NS \
-        ENABLE_SVE_FOR_SWD \
         ERROR_DEPRECATED \
         FAULT_INJECTION_SUPPORT \
         GENERATE_COT \
@@ -962,8 +944,6 @@ $(eval $(call assert_booleans,\
         COT_DESC_IN_DTB \
         USE_SP804_TIMER \
         ENABLE_FEAT_RNG \
-        ENABLE_FEAT_SB \
-        PSA_FWU_SUPPORT \
 )))
 
 $(eval $(call assert_numerics,\
@@ -972,8 +952,6 @@ $(eval $(call assert_numerics,\
         ARM_ARCH_MINOR \
         BRANCH_PROTECTION \
         FW_ENC_STATUS \
-        NR_OF_FW_BANKS \
-        NR_OF_IMAGES_IN_FW_BANK \
 )))
 
 ifdef KEY_SIZE
@@ -1006,7 +984,6 @@ $(eval $(call add_defines,\
         DECRYPTION_SUPPORT_${DECRYPTION_SUPPORT} \
         DISABLE_MTPMU \
         ENABLE_AMU \
-        AMU_RESTRICT_COUNTERS \
         ENABLE_ASSERTIONS \
         ENABLE_BTI \
         ENABLE_MPAM_FOR_LOWER_ELS \
@@ -1017,7 +994,6 @@ $(eval $(call add_defines,\
         ENABLE_RUNTIME_INSTRUMENTATION \
         ENABLE_SPE_FOR_LOWER_ELS \
         ENABLE_SVE_FOR_NS \
-        ENABLE_SVE_FOR_SWD \
         ENCRYPT_BL31 \
         ENCRYPT_BL32 \
         ERROR_DEPRECATED \
@@ -1060,10 +1036,6 @@ $(eval $(call add_defines,\
         COT_DESC_IN_DTB \
         USE_SP804_TIMER \
         ENABLE_FEAT_RNG \
-        ENABLE_FEAT_SB \
-        NR_OF_FW_BANKS \
-        NR_OF_IMAGES_IN_FW_BANK \
-        PSA_FWU_SUPPORT \
 )))
 
 ifeq (${SANITIZE_UB},trap)
@@ -1324,6 +1296,8 @@ fip: ${BUILD_PLAT}/${FIP_NAME}
 fwu_fip: ${BUILD_PLAT}/${FWU_FIP_NAME}
 
 ${FIPTOOL}: FORCE
+	@${ECHO_BLANK_LINE}
+	@echo "Building $@"
 ifdef UNIX_MK
 	${Q}${MAKE} CPPFLAGS="-DVERSION='\"${VERSION_STRING}\"'" FIPTOOL=${FIPTOOL} --no-print-directory -C ${FIPTOOLPATH}
 else
@@ -1331,6 +1305,7 @@ else
 # to pass the gnumake flags to nmake.
 	${Q}set MAKEFLAGS= && ${MSVC_NMAKE} /nologo /f ${FIPTOOLPATH}/Makefile.msvc FIPTOOLPATH=$(subst /,\,$(FIPTOOLPATH)) FIPTOOL=$(subst /,\,$(FIPTOOL))
 endif
+	@${ECHO_BLANK_LINE}
 
 sptool: ${SPTOOL}
 ${SPTOOL}: FORCE
