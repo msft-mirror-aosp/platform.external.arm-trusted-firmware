@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -18,17 +18,13 @@
 
 static struct amu_ctx amu_ctxs[PLATFORM_CORE_COUNT];
 
-/*
- * Get AMU version value from pfr0.
- * Return values
- *   ID_PFR0_AMU_V1: FEAT_AMUv1 supported (introduced in ARM v8.4)
- *   ID_PFR0_AMU_V1P1: FEAT_AMUv1p1 supported (introduced in ARM v8.6)
- *   ID_PFR0_AMU_NOT_SUPPORTED: not supported
- */
-unsigned int amu_get_version(void)
+/* Check if AMUv1 for Armv8.4 or 8.6 is implemented */
+bool amu_supported(void)
 {
-	return (unsigned int)(read_id_pfr0() >> ID_PFR0_AMU_SHIFT) &
-		ID_PFR0_AMU_MASK;
+	uint32_t features = read_id_pfr0() >> ID_PFR0_AMU_SHIFT;
+
+	features &= ID_PFR0_AMU_MASK;
+	return ((features == 1U) || (features == 2U));
 }
 
 #if AMU_GROUP1_NR_COUNTERS
@@ -47,7 +43,7 @@ bool amu_group1_supported(void)
  */
 void amu_enable(bool el2_unused)
 {
-	if (amu_get_version() == ID_PFR0_AMU_NOT_SUPPORTED) {
+	if (!amu_supported()) {
 		return;
 	}
 
@@ -91,31 +87,12 @@ void amu_enable(bool el2_unused)
 	/* Enable group 1 counters */
 	write_amcntenset1(AMU_GROUP1_COUNTERS_MASK);
 #endif
-
-	/* Initialize FEAT_AMUv1p1 features if present. */
-	if (amu_get_version() < ID_PFR0_AMU_V1P1) {
-		return;
-	}
-
-#if AMU_RESTRICT_COUNTERS
-	/*
-	 * FEAT_AMUv1p1 adds a register field to restrict access to group 1
-	 * counters at all but the highest implemented EL.  This is controlled
-	 * with the AMU_RESTRICT_COUNTERS compile time flag, when set, system
-	 * register reads at lower ELs return zero.  Reads from the memory
-	 * mapped view are unaffected.
-	 */
-	VERBOSE("AMU group 1 counter access restricted.\n");
-	write_amcr(read_amcr() | AMCR_CG1RZ_BIT);
-#else
-	write_amcr(read_amcr() & ~AMCR_CG1RZ_BIT);
-#endif
 }
 
 /* Read the group 0 counter identified by the given `idx`. */
 uint64_t amu_group0_cnt_read(unsigned int idx)
 {
-	assert(amu_get_version() != ID_PFR0_AMU_NOT_SUPPORTED);
+	assert(amu_supported());
 	assert(idx < AMU_GROUP0_NR_COUNTERS);
 
 	return amu_group0_cnt_read_internal(idx);
@@ -124,7 +101,7 @@ uint64_t amu_group0_cnt_read(unsigned int idx)
 /* Write the group 0 counter identified by the given `idx` with `val` */
 void amu_group0_cnt_write(unsigned  int idx, uint64_t val)
 {
-	assert(amu_get_version() != ID_PFR0_AMU_NOT_SUPPORTED);
+	assert(amu_supported());
 	assert(idx < AMU_GROUP0_NR_COUNTERS);
 
 	amu_group0_cnt_write_internal(idx, val);
@@ -135,7 +112,7 @@ void amu_group0_cnt_write(unsigned  int idx, uint64_t val)
 /* Read the group 1 counter identified by the given `idx` */
 uint64_t amu_group1_cnt_read(unsigned  int idx)
 {
-	assert(amu_get_version() != ID_PFR0_AMU_NOT_SUPPORTED);
+	assert(amu_supported());
 	assert(amu_group1_supported());
 	assert(idx < AMU_GROUP1_NR_COUNTERS);
 
@@ -145,7 +122,7 @@ uint64_t amu_group1_cnt_read(unsigned  int idx)
 /* Write the group 1 counter identified by the given `idx` with `val` */
 void amu_group1_cnt_write(unsigned  int idx, uint64_t val)
 {
-	assert(amu_get_version() != ID_PFR0_AMU_NOT_SUPPORTED);
+	assert(amu_supported());
 	assert(amu_group1_supported());
 	assert(idx < AMU_GROUP1_NR_COUNTERS);
 
@@ -159,7 +136,7 @@ void amu_group1_cnt_write(unsigned  int idx, uint64_t val)
  */
 void amu_group1_set_evtype(unsigned int idx, unsigned int val)
 {
-	assert(amu_get_version() != ID_PFR0_AMU_NOT_SUPPORTED);
+	assert(amu_supported());
 	assert(amu_group1_supported());
 	assert(idx < AMU_GROUP1_NR_COUNTERS);
 
@@ -173,7 +150,7 @@ static void *amu_context_save(const void *arg)
 	struct amu_ctx *ctx = &amu_ctxs[plat_my_core_pos()];
 	unsigned int i;
 
-	if (amu_get_version() == ID_PFR0_AMU_NOT_SUPPORTED) {
+	if (!amu_supported()) {
 		return (void *)-1;
 	}
 
@@ -220,7 +197,7 @@ static void *amu_context_restore(const void *arg)
 	struct amu_ctx *ctx = &amu_ctxs[plat_my_core_pos()];
 	unsigned int i;
 
-	if (amu_get_version() == ID_PFR0_AMU_NOT_SUPPORTED) {
+	if (!amu_supported()) {
 		return (void *)-1;
 	}
 
