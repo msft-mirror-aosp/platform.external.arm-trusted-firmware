@@ -188,8 +188,6 @@ int dt_add_psci_cpu_enable_methods(void *fdt)
  *
  * See reserved-memory/reserved-memory.txt in the (Linux kernel) DT binding
  * documentation for details.
- * According to this binding, the address-cells and size-cells must match
- * those of the root node.
  *
  * Return: 0 on success, a negative error value otherwise.
  ******************************************************************************/
@@ -197,37 +195,23 @@ int fdt_add_reserved_memory(void *dtb, const char *node_name,
 			    uintptr_t base, size_t size)
 {
 	int offs = fdt_path_offset(dtb, "/reserved-memory");
-	uint32_t addresses[4];
-	int ac, sc;
-	unsigned int idx = 0;
+	uint32_t addresses[3];
 
-	ac = fdt_address_cells(dtb, 0);
-	sc = fdt_size_cells(dtb, 0);
 	if (offs < 0) {			/* create if not existing yet */
 		offs = fdt_add_subnode(dtb, 0, "reserved-memory");
-		if (offs < 0) {
+		if (offs < 0)
 			return offs;
-		}
-		fdt_setprop_u32(dtb, offs, "#address-cells", ac);
-		fdt_setprop_u32(dtb, offs, "#size-cells", sc);
+		fdt_setprop_u32(dtb, offs, "#address-cells", 2);
+		fdt_setprop_u32(dtb, offs, "#size-cells", 1);
 		fdt_setprop(dtb, offs, "ranges", NULL, 0);
 	}
 
-	if (ac > 1) {
-		addresses[idx] = cpu_to_fdt32(HIGH_BITS(base));
-		idx++;
-	}
-	addresses[idx] = cpu_to_fdt32(base & 0xffffffff);
-	idx++;
-	if (sc > 1) {
-		addresses[idx] = cpu_to_fdt32(HIGH_BITS(size));
-		idx++;
-	}
-	addresses[idx] = cpu_to_fdt32(size & 0xffffffff);
-	idx++;
+	addresses[0] = cpu_to_fdt32(HIGH_BITS(base));
+	addresses[1] = cpu_to_fdt32(base & 0xffffffff);
+	addresses[2] = cpu_to_fdt32(size & 0xffffffff);
 	offs = fdt_add_subnode(dtb, offs, node_name);
 	fdt_setprop(dtb, offs, "no-map", NULL, 0);
-	fdt_setprop(dtb, offs, "reg", addresses, idx * sizeof(uint32_t));
+	fdt_setprop(dtb, offs, "reg", addresses, 12);
 
 	return 0;
 }
