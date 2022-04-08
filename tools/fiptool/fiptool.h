@@ -48,7 +48,7 @@ typedef struct image {
 typedef struct cmd {
 	char              *name;
 	int              (*handler)(int, char **);
-	void             (*usage)(int);
+	void             (*usage)(void);
 } cmd_t;
 
 #endif /* FIPTOOL_H */

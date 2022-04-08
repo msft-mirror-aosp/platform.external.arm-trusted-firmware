@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -27,9 +27,9 @@ typedef struct {
 	uintptr_t		base;
 	unsigned long long	file_pos;
 	unsigned long long	size;
-} memmap_file_state_t;
+} file_state_t;
 
-static memmap_file_state_t current_memmap_file = {0};
+static file_state_t current_file = {0};
 
 /* Identify the device type as memmap */
 static io_type_t device_type_memmap(void)
@@ -71,7 +71,7 @@ static const io_dev_funcs_t memmap_dev_funcs = {
 
 
 /* No state associated with this device so structure can be const */
-static io_dev_info_t memmap_dev_info = {
+static const io_dev_info_t memmap_dev_info = {
 	.funcs = &memmap_dev_funcs,
 	.info = (uintptr_t)NULL
 };
@@ -82,7 +82,8 @@ static int memmap_dev_open(const uintptr_t dev_spec __unused,
 			   io_dev_info_t **dev_info)
 {
 	assert(dev_info != NULL);
-	*dev_info = &memmap_dev_info;
+	*dev_info = (io_dev_info_t *)&memmap_dev_info; /* cast away const */
+
 	return 0;
 }
 
@@ -108,16 +109,16 @@ static int memmap_block_open(io_dev_info_t *dev_info, const uintptr_t spec,
 	 * spec at a time. When we have dynamic memory we can malloc and set
 	 * entity->info.
 	 */
-	if (current_memmap_file.in_use == 0) {
+	if (current_file.in_use == 0) {
 		assert(block_spec != NULL);
 		assert(entity != NULL);
 
-		current_memmap_file.in_use = 1;
-		current_memmap_file.base = block_spec->offset;
+		current_file.in_use = 1;
+		current_file.base = block_spec->offset;
 		/* File cursor offset for seek and incremental reads etc. */
-		current_memmap_file.file_pos = 0;
-		current_memmap_file.size = block_spec->length;
-		entity->info = (uintptr_t)&current_memmap_file;
+		current_file.file_pos = 0;
+		current_file.size = block_spec->length;
+		entity->info = (uintptr_t)&current_file;
 		result = 0;
 	} else {
 		WARN("A Memmap device is already active. Close first.\n");
@@ -132,13 +133,13 @@ static int memmap_block_seek(io_entity_t *entity, int mode,
 			     signed long long offset)
 {
 	int result = -ENOENT;
-	memmap_file_state_t *fp;
+	file_state_t *fp;
 
 	/* We only support IO_SEEK_SET for the moment. */
 	if (mode == IO_SEEK_SET) {
 		assert(entity != NULL);
 
-		fp = (memmap_file_state_t *) entity->info;
+		fp = (file_state_t *) entity->info;
 
 		/* Assert that new file position is valid */
 		assert((offset >= 0) &&
@@ -159,7 +160,7 @@ static int memmap_block_len(io_entity_t *entity, size_t *length)
 	assert(entity != NULL);
 	assert(length != NULL);
 
-	*length = (size_t)((memmap_file_state_t *)entity->info)->size;
+	*length = (size_t)((file_state_t *)entity->info)->size;
 
 	return 0;
 }
@@ -169,13 +170,13 @@ static int memmap_block_len(io_entity_t *entity, size_t *length)
 static int memmap_block_read(io_entity_t *entity, uintptr_t buffer,
 			     size_t length, size_t *length_read)
 {
-	memmap_file_state_t *fp;
+	file_state_t *fp;
 	unsigned long long pos_after;
 
 	assert(entity != NULL);
 	assert(length_read != NULL);
 
-	fp = (memmap_file_state_t *) entity->info;
+	fp = (file_state_t *) entity->info;
 
 	/* Assert that file position is valid for this read operation */
 	pos_after = fp->file_pos + length;
@@ -197,13 +198,13 @@ static int memmap_block_read(io_entity_t *entity, uintptr_t buffer,
 static int memmap_block_write(io_entity_t *entity, const uintptr_t buffer,
 			      size_t length, size_t *length_written)
 {
-	memmap_file_state_t *fp;
+	file_state_t *fp;
 	unsigned long long pos_after;
 
 	assert(entity != NULL);
 	assert(length_written != NULL);
 
-	fp = (memmap_file_state_t *) entity->info;
+	fp = (file_state_t *) entity->info;
 
 	/* Assert that file position is valid for this write operation */
 	pos_after = fp->file_pos + length;
@@ -229,7 +230,7 @@ static int memmap_block_close(io_entity_t *entity)
 	entity->info = 0;
 
 	/* This would be a mem free() if we had malloc.*/
-	zeromem((void *)&current_memmap_file, sizeof(current_memmap_file));
+	zeromem((void *)&current_file, sizeof(current_file));
 
 	return 0;
 }

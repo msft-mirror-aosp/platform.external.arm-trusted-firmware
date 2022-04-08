@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause
  */
@@ -9,17 +9,12 @@
 #include <platform_def.h>
 
 #include <common/debug.h>
-#include <common/fdt_wrappers.h>
 #include <drivers/delay_timer.h>
 #include <drivers/spi_mem.h>
 #include <drivers/st/stm32_gpio.h>
-#include <drivers/st/stm32_qspi.h>
 #include <drivers/st/stm32mp_reset.h>
 #include <lib/mmio.h>
 #include <lib/utils_def.h>
-
-/* Timeout for device interface reset */
-#define TIMEOUT_US_1_MS			1000U
 
 /* QUADSPI registers */
 #define QSPI_CR			0x00U
@@ -177,8 +172,9 @@ static void stm32_qspi_write_fifo(uint8_t *val, uintptr_t addr)
 static int stm32_qspi_poll(const struct spi_mem_op *op)
 {
 	void (*fifo)(uint8_t *val, uintptr_t addr);
-	uint32_t len;
+	uint32_t len = op->data.nbytes;
 	uint8_t *buf;
+	uint64_t timeout;
 
 	if (op->data.dir == SPI_MEM_DATA_IN) {
 		fifo = stm32_qspi_read_fifo;
@@ -189,8 +185,7 @@ static int stm32_qspi_poll(const struct spi_mem_op *op)
 	buf = (uint8_t *)op->data.buf;
 
 	for (len = op->data.nbytes; len != 0U; len--) {
-		uint64_t timeout = timeout_init_us(QSPI_FIFO_TIMEOUT_US);
-
+		timeout = timeout_init_us(QSPI_FIFO_TIMEOUT_US);
 		while ((mmio_read_32(qspi_base() + QSPI_SR) &
 			QSPI_SR_FTF) == 0U) {
 			if (timeout_elapsed(timeout)) {
@@ -469,13 +464,13 @@ int stm32_qspi_init(void)
 		return -FDT_ERR_NOTFOUND;
 	}
 
-	ret = fdt_get_reg_props_by_name(fdt, qspi_node, "qspi",
+	ret = fdt_get_reg_props_by_name(qspi_node, "qspi",
 					&stm32_qspi.reg_base, &size);
 	if (ret != 0) {
 		return ret;
 	}
 
-	ret = fdt_get_reg_props_by_name(fdt, qspi_node, "qspi_mm",
+	ret = fdt_get_reg_props_by_name(qspi_node, "qspi_mm",
 					&stm32_qspi.mm_base,
 					&stm32_qspi.mm_size);
 	if (ret != 0) {
@@ -495,14 +490,8 @@ int stm32_qspi_init(void)
 
 	stm32mp_clk_enable(stm32_qspi.clock_id);
 
-	ret = stm32mp_reset_assert(stm32_qspi.reset_id, TIMEOUT_US_1_MS);
-	if (ret != 0) {
-		panic();
-	}
-	ret = stm32mp_reset_deassert(stm32_qspi.reset_id, TIMEOUT_US_1_MS);
-	if (ret != 0) {
-		panic();
-	}
+	stm32mp_reset_assert(stm32_qspi.reset_id);
+	stm32mp_reset_deassert(stm32_qspi.reset_id);
 
 	mmio_write_32(qspi_base() + QSPI_CR, QSPI_CR_SSHIFT);
 	mmio_write_32(qspi_base() + QSPI_DCR, QSPI_DCR_FSIZE_MASK);

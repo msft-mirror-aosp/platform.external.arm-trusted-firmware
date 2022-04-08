@@ -87,12 +87,7 @@ struct uniphier_mmc_cmd {
 	unsigned int is_data;
 };
 
-struct uniphier_emmc_host {
-	uintptr_t base;
-	bool is_block_addressing;
-};
-
-static struct uniphier_emmc_host uniphier_emmc_host;
+static int uniphier_emmc_block_addressing;
 
 static int uniphier_emmc_send_cmd(uintptr_t host_base,
 				  struct uniphier_mmc_cmd *cmd)
@@ -162,8 +157,7 @@ static int uniphier_emmc_switch_part(uintptr_t host_base, int part_num)
 	return uniphier_emmc_send_cmd(host_base, &cmd);
 }
 
-static int uniphier_emmc_check_device_size(uintptr_t host_base,
-					   bool *is_block_addressing)
+static int uniphier_emmc_is_over_2gb(uintptr_t host_base)
 {
 	struct uniphier_mmc_cmd cmd = {0};
 	uint32_t csd40, csd72;	/* CSD[71:40], CSD[103:72] */
@@ -180,10 +174,7 @@ static int uniphier_emmc_check_device_size(uintptr_t host_base,
 	csd40 = mmio_read_32(host_base + SDHCI_RESPONSE + 4);
 	csd72 = mmio_read_32(host_base + SDHCI_RESPONSE + 8);
 
-	/* C_SIZE == 0xfff && C_SIZE_MULT == 0x7 ? */
-	*is_block_addressing = !(~csd40 & 0xffc00380) && !(~csd72 & 0x3);
-
-	return 0;
+	return !(~csd40 & 0xffc00380) && !(~csd72 & 0x3);
 }
 
 static int uniphier_emmc_load_image(uintptr_t host_base,
@@ -219,15 +210,15 @@ static int uniphier_emmc_load_image(uintptr_t host_base,
 
 static size_t uniphier_emmc_read(int lba, uintptr_t buf, size_t size)
 {
+	uintptr_t host_base = 0x5a000200;
 	int ret;
 
 	inv_dcache_range(buf, size);
 
-	if (!uniphier_emmc_host.is_block_addressing)
+	if (!uniphier_emmc_block_addressing)
 		lba *= 512;
 
-	ret = uniphier_emmc_load_image(uniphier_emmc_host.base,
-				       lba, buf, size / 512);
+	ret = uniphier_emmc_load_image(host_base, lba, buf, size / 512);
 
 	inv_dcache_range(buf, size);
 
@@ -241,10 +232,10 @@ static struct io_block_dev_spec uniphier_emmc_dev_spec = {
 	.block_size = 512,
 };
 
-static int uniphier_emmc_hw_init(struct uniphier_emmc_host *host)
+static int uniphier_emmc_hw_init(void)
 {
+	uintptr_t host_base = 0x5a000200;
 	struct uniphier_mmc_cmd cmd = {0};
-	uintptr_t host_base = uniphier_emmc_host.base;
 	int ret;
 
 	/*
@@ -262,10 +253,11 @@ static int uniphier_emmc_hw_init(struct uniphier_emmc_host *host)
 	while (mmio_read_8(host_base + SDHCI_SOFTWARE_RESET))
 		;
 
-	ret = uniphier_emmc_check_device_size(host_base,
-				&uniphier_emmc_host.is_block_addressing);
-	if (ret)
+	ret = uniphier_emmc_is_over_2gb(host_base);
+	if (ret < 0)
 		return ret;
+
+	uniphier_emmc_block_addressing = ret;
 
 	cmd.cmdarg = UNIPHIER_EMMC_RCA << 16;
 
@@ -282,23 +274,11 @@ static int uniphier_emmc_hw_init(struct uniphier_emmc_host *host)
 	return 0;
 }
 
-static const uintptr_t uniphier_emmc_base[] = {
-	[UNIPHIER_SOC_LD11] = 0x5a000200,
-	[UNIPHIER_SOC_LD20] = 0x5a000200,
-	[UNIPHIER_SOC_PXS3] = 0x5a000200,
-};
-
-int uniphier_emmc_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec)
+int uniphier_emmc_init(struct io_block_dev_spec **block_dev_spec)
 {
 	int ret;
 
-	assert(soc < ARRAY_SIZE(uniphier_emmc_base));
-	uniphier_emmc_host.base = uniphier_emmc_base[soc];
-	if (uniphier_emmc_host.base == 0UL)
-		return -ENOTSUP;
-
-	ret = uniphier_emmc_hw_init(&uniphier_emmc_host);
+	ret = uniphier_emmc_hw_init();
 	if (ret)
 		return ret;
 

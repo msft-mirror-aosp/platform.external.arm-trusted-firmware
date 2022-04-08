@@ -220,16 +220,11 @@
 
 	/*
 	 * Macro for mitigating against speculative execution beyond ERET.
-	 * If possible use Speculation Barrier instruction defined in ARMv8.5
 	 */
 	.macro exception_return
 	eret
-#if ARM_ARCH_AT_LEAST(8, 5)
-	sb
-#else
-	dsb	nsh
+	dsb nsh
 	isb
-#endif
 	.endm
 
 #endif /* ASM_MACROS_S */

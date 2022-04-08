@@ -6,17 +6,20 @@
  */
 
 #include <errno.h>
+#include <string.h>
 
+#include <arch_helpers.h>
 #include <common/debug.h>
 #include <drivers/allwinner/axp.h>
-#include <drivers/allwinner/sunxi_rsb.h>
+#include <drivers/delay_timer.h>
+#include <drivers/mentor/mi2cv.h>
+#include <lib/mmio.h>
 
 #include <sunxi_def.h>
 #include <sunxi_mmap.h>
 #include <sunxi_private.h>
 
-#define AXP805_HW_ADDR	0x745
-#define AXP805_RT_ADDR	0x3a
+#define AXP805_ADDR	0x36
 
 static enum pmic_type {
 	UNKNOWN,
@@ -25,66 +28,66 @@ static enum pmic_type {
 
 int axp_read(uint8_t reg)
 {
-	return rsb_read(AXP805_RT_ADDR, reg);
+	uint8_t val;
+	int ret;
+
+	ret = i2c_write(AXP805_ADDR, 0, 0, &reg, 1);
+	if (ret == 0)
+		ret = i2c_read(AXP805_ADDR, 0, 0, &val, 1);
+	if (ret) {
+		ERROR("PMIC: Cannot read AXP805 register %02x\n", reg);
+		return ret;
+	}
+
+	return val;
 }
 
 int axp_write(uint8_t reg, uint8_t val)
 {
-	return rsb_write(AXP805_RT_ADDR, reg, val);
-}
-
-static int rsb_init(void)
-{
 	int ret;
 
-	ret = rsb_init_controller();
+	ret = i2c_write(AXP805_ADDR, reg, 1, &val, 1);
 	if (ret)
-		return ret;
+		ERROR("PMIC: Cannot write AXP805 register %02x\n", reg);
 
-	/* Switch to the recommended 3 MHz bus clock. */
-	ret = rsb_set_bus_speed(SUNXI_OSC24M_CLK_IN_HZ, 3000000);
-	if (ret)
-		return ret;
-
-	/* Initiate an I2C transaction to switch the PMIC to RSB mode. */
-	ret = rsb_set_device_mode(AXP20X_MODE_RSB << 16 | AXP20X_MODE_REG << 8);
-	if (ret)
-		return ret;
-
-	/* Associate the 8-bit runtime address with the 12-bit bus address. */
-	ret = rsb_assign_runtime_address(AXP805_HW_ADDR, AXP805_RT_ADDR);
-	if (ret)
-		return ret;
-
-	return axp_check_id();
+	return ret;
 }
 
-int sunxi_pmic_setup(uint16_t socid, const void *fdt)
+static int axp805_probe(void)
 {
 	int ret;
-
-	INFO("PMIC: Probing AXP805 on RSB\n");
-
-	ret = sunxi_init_platform_r_twi(socid, true);
-	if (ret)
-		return ret;
-
-	ret = rsb_init();
-	if (ret)
-		return ret;
 
 	/* Switch the AXP805 to master/single-PMIC mode. */
 	ret = axp_write(0xff, 0x0);
 	if (ret)
 		return ret;
 
-	pmic = AXP805;
-	axp_setup_regulators(fdt);
-
-	/* Switch the PMIC back to I2C mode. */
-	ret = axp_write(AXP20X_MODE_REG, AXP20X_MODE_I2C);
+	ret = axp_check_id();
 	if (ret)
 		return ret;
+
+	return 0;
+}
+
+int sunxi_pmic_setup(uint16_t socid, const void *fdt)
+{
+	int ret;
+
+	INFO("PMIC: Probing AXP805 on I2C\n");
+
+	ret = sunxi_init_platform_r_twi(SUNXI_SOC_H6, false);
+	if (ret)
+		return ret;
+
+	/* initialise mi2cv driver */
+	i2c_init((void *)SUNXI_R_I2C_BASE);
+
+	ret = axp805_probe();
+	if (ret)
+		return ret;
+
+	pmic = AXP805;
+	axp_setup_regulators(fdt);
 
 	return 0;
 }
@@ -93,9 +96,10 @@ void sunxi_power_down(void)
 {
 	switch (pmic) {
 	case AXP805:
-		/* (Re-)init RSB in case the rich OS has disabled it. */
-		sunxi_init_platform_r_twi(SUNXI_SOC_H6, true);
-		rsb_init();
+		/* Re-initialise after rich OS might have used it. */
+		sunxi_init_platform_r_twi(SUNXI_SOC_H6, false);
+		/* initialise mi2cv driver */
+		i2c_init((void *)SUNXI_R_I2C_BASE);
 		axp_power_off();
 		break;
 	default:

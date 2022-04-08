@@ -11,7 +11,11 @@
 #include <stdint.h>
 #include <drivers/gpio.h>
 
-void rpi3_gpio_init(void);
+struct rpi3_gpio_params {
+	uintptr_t       reg_base;
+};
+
+void rpi3_gpio_init(struct rpi3_gpio_params *params);
 int rpi3_gpio_get_select(int gpio);
 void rpi3_gpio_set_select(int gpio, int fsel);
 

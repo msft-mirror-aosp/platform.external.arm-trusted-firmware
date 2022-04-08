@@ -89,7 +89,6 @@
 
 /* Peripheral PLL Macros */
 #define CLKMGR_PERPLL_EN_RESET			0x00000fff
-#define CLKMGR_PERPLL_EN_SDMMCCLK		BIT(5)
 #define CLKMGR_PERPLL_GPIODIV_GPIODBCLK_SET(x)	(((x) << 0) & 0x0000ffff)
 
 /* Altera Macros */

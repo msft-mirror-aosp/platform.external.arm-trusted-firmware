@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,14 +9,12 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <stdbool.h>
+#include <direct.h>
+#include <io.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-#include <direct.h>
-#include <io.h>
 
 #include "uuid.h"
 

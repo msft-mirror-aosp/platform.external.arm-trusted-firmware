@@ -235,7 +235,7 @@
 
 	/* Restore the rest of the general purpose registers */
 	ldm	r0, {r0-r12}
-	exception_return
+	eret
 	.endm
 
 #endif /* SMCCC_MACROS_S */

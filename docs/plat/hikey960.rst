@@ -26,6 +26,9 @@ Code Locations
 -  l-loader:
    `link <https://github.com/96boards-hikey/l-loader/tree/testing/hikey960_v1.2>`__
 
+-  uefi-tools:
+   `link <https://git.linaro.org/uefi/uefi-tools.git>`__
+
 Build Procedure
 ~~~~~~~~~~~~~~~
 
@@ -39,6 +42,7 @@ Build Procedure
        git clone https://github.com/96boards-hikey/edk2 -b testing/hikey960_v2.5
        git clone https://github.com/96boards-hikey/OpenPlatformPkg -b testing/hikey960_v1.3.4
        git clone https://github.com/96boards-hikey/l-loader -b testing/hikey960_v1.2
+       git clone https://git.linaro.org/uefi/uefi-tools
 
 -  Create the symbol link to OpenPlatformPkg in edk2.
 
@@ -49,11 +53,13 @@ Build Procedure
 
 -  Prepare AARCH64 toolchain.
 
--  If your hikey960 hardware is v1, update *OpenPlatformPkg/Platforms/Hisilicon/HiKey960/HiKey960.dsc* first. *(optional)*
+-  If your hikey960 hardware is v1, update *uefi-tools/platform.config* first. *(optional)*
+   **Uncomment the below sentence. Otherwise, UEFI can't output messages on serial
+   console on hikey960 v1.**
 
    .. code:: shell
 
-       DEFINE SERIAL_BASE=0xFDF05000
+       BUILDFLAGS=-DSERIAL_BASE=0xFDF05000
 
    If your hikey960 hardware is v2 or newer, nothing to do.
 
@@ -61,8 +67,14 @@ Build Procedure
 
    .. code:: shell
 
-       cd {BUILD_PATH}/arm-trusted-firmware
-       sh ../l-loader/build_uefi.sh hikey960
+       BUILD_OPTION=DEBUG
+       export AARCH64_TOOLCHAIN=GCC5
+       export UEFI_TOOLS_DIR=${BUILD_PATH}/uefi-tools
+       export EDK2_DIR=${BUILD_PATH}/edk2
+       EDK2_OUTPUT_DIR=${EDK2_DIR}/Build/HiKey960/${BUILD_OPTION}_${AARCH64_TOOLCHAIN}
+       cd ${EDK2_DIR}
+       # Build UEFI & Trusted Firmware-A
+       ${UEFI_TOOLS_DIR}/uefi-build.sh -b ${BUILD_OPTION} -a ../arm-trusted-firmware -s ../optee_os hikey960
 
 -  Generate l-loader.bin and partition table.
    *Make sure that you're using the sgdisk in the l-loader directory.*

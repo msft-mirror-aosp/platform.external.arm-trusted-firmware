@@ -14,6 +14,6 @@ LIBFDT_SRCS	:=	$(addprefix lib/libfdt/libfdt/,	\
 			fdt_sw.c			\
 			fdt_wip.c)			\
 
-INCLUDES	+=	-Iinclude/lib/libfdt/
+INCLUDES	+=	-Ilib/libfdt/libfdt
 
 $(eval $(call MAKE_LIB,fdt))

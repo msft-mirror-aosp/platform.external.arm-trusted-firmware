@@ -61,9 +61,16 @@
 #define UARTLSR_OVRF		(1 << 2)	/* Rx Overrun Error */
 #define UARTLSR_RDR		(1 << 2)	/* Rx Data Ready */
 
+#define CONSOLE_T_16550_BASE	CONSOLE_T_DRVDATA
+
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
+
+typedef struct {
+	console_t console;
+	uintptr_t base;
+} console_ls_16550_t;
 
 /*
  * Initialize a new 16550 console instance and register it with the console
@@ -72,7 +79,7 @@
  * Its contents will be reinitialized from scratch.
  */
 int console_ls_16550_register(uintptr_t baseaddr, uint32_t clock, uint32_t baud,
-			      console_t *console);
+			   console_ls_16550_t *console);
 
 #endif /*__ASSEMBLER__*/
 

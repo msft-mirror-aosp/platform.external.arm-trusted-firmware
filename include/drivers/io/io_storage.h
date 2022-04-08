@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -25,7 +25,6 @@ typedef enum {
 	IO_TYPE_MTD,
 	IO_TYPE_MMC,
 	IO_TYPE_STM32IMAGE,
-	IO_TYPE_ENCRYPTED,
 	IO_TYPE_MAX
 } io_type_t;
 
@@ -54,7 +53,7 @@ typedef struct io_file_spec {
 /* UUID specification - used to refer to data accessed using UUIDs (i.e. FIP
  * images) */
 typedef struct io_uuid_spec {
-	uuid_t uuid;
+	const uuid_t uuid;
 } io_uuid_spec_t;
 
 /* Block specification - used to refer to data on a device supporting

@@ -65,10 +65,6 @@ unsigned int pm_get_shutdown_scope(void)
 	PM_PACK_PAYLOAD5(pl, arg0, arg1, arg2, arg3, arg4);		\
 }
 
-#define EM_PACK_PAYLOAD1(pl, arg0) {	\
-	pl[0] = (uint16_t)(0xE) << 16 | (uint16_t)arg0;	\
-}
-
 /**
  * pm_self_suspend() - PM call for processor to suspend itself
  * @nid		Node id of the processor or subsystem
@@ -659,11 +655,7 @@ void pm_get_callbackdata(uint32_t *data, size_t count)
  */
 enum pm_ret_status pm_pinctrl_request(unsigned int pin)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	PM_PACK_PAYLOAD2(payload, PM_PINCTRL_REQUEST, pin);
-	return pm_ipi_send_sync(primary_proc, payload, NULL, 0);
+	return PM_RET_SUCCESS;
 }
 
 /**
@@ -676,44 +668,37 @@ enum pm_ret_status pm_pinctrl_request(unsigned int pin)
  */
 enum pm_ret_status pm_pinctrl_release(unsigned int pin)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	PM_PACK_PAYLOAD2(payload, PM_PINCTRL_RELEASE, pin);
-	return pm_ipi_send_sync(primary_proc, payload, NULL, 0);
+	return PM_RET_SUCCESS;
 }
 
 /**
  * pm_pinctrl_get_function() - Read function id set for the given pin
  * @pin		Pin number
- * @fid		ID of function currently set for given pin
+ * @nid		Node ID of function currently set for given pin
  *
  * This function provides the function currently set for the given pin.
  *
  * @return	Returns status, either success or error+reason
  */
-enum pm_ret_status pm_pinctrl_get_function(unsigned int pin, unsigned int *fid)
+enum pm_ret_status pm_pinctrl_get_function(unsigned int pin,
+					   enum pm_node_id *nid)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	PM_PACK_PAYLOAD2(payload, PM_PINCTRL_GET_FUNCTION, pin);
-	return pm_ipi_send_sync(primary_proc, payload, fid, 1);
+	return pm_api_pinctrl_get_function(pin, nid);
 }
 
 /**
  * pm_pinctrl_set_function() - Set function id set for the given pin
  * @pin		Pin number
- * @fid		ID of function to set for given pin
+ * @nid		Node ID of function to set for given pin
+ *
+ * This function provides the function currently set for the given pin.
  *
  * @return	Returns status, either success or error+reason
  */
-enum pm_ret_status pm_pinctrl_set_function(unsigned int pin, unsigned int fid)
+enum pm_ret_status pm_pinctrl_set_function(unsigned int pin,
+					   enum pm_node_id nid)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	PM_PACK_PAYLOAD3(payload, PM_PINCTRL_SET_FUNCTION, pin, fid);
-	return pm_ipi_send_sync(primary_proc, payload, NULL, 0);
+	return pm_api_pinctrl_set_function(pin, (unsigned int)nid);
 }
 
 /**
@@ -730,17 +715,16 @@ enum pm_ret_status pm_pinctrl_get_config(unsigned int pin,
 					 unsigned int param,
 					 unsigned int *value)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	PM_PACK_PAYLOAD3(payload, PM_PINCTRL_CONFIG_PARAM_GET, pin, param);
-	return pm_ipi_send_sync(primary_proc, payload, value, 1);
+	return pm_api_pinctrl_get_config(pin, param, value);
 }
 
 /**
- * pm_pinctrl_set_config() - Set value of requested config param for given pin
+ * pm_pinctrl_set_config() - Read value of requested config param for given pin
  * @pin		Pin number
  * @param	Parameter to set
  * @value	Parameter value to set
+ *
+ * This function provides the configuration parameter value for the given pin.
  *
  * @return	Returns status, either success or error+reason
  */
@@ -748,12 +732,7 @@ enum pm_ret_status pm_pinctrl_set_config(unsigned int pin,
 					 unsigned int param,
 					 unsigned int value)
 {
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	PM_PACK_PAYLOAD4(payload, PM_PINCTRL_CONFIG_PARAM_SET, pin, param,
-			 value);
-	return pm_ipi_send_sync(primary_proc, payload, NULL, 0);
+	return pm_api_pinctrl_set_config(pin, param, value);
 }
 
 /**
@@ -814,10 +793,12 @@ static enum pm_ret_status pm_clock_get_num_clocks(uint32_t *nclocks)
  *
  * This function is used by master to get nmae of clock specified
  * by given clock ID.
+ *
+ * @return	Returns status, either success or error+reason
  */
-static void pm_clock_get_name(unsigned int clock_id, char *name)
+static enum pm_ret_status pm_clock_get_name(unsigned int clock_id, char *name)
 {
-	pm_api_clock_get_name(clock_id, name);
+	return pm_api_clock_get_name(clock_id, name);
 }
 
 /**
@@ -926,13 +907,7 @@ static enum pm_ret_status pm_clock_gate(unsigned int clock_id,
 
 	/* Send request to the PMU */
 	PM_PACK_PAYLOAD2(payload, api_id, clock_id);
-	status = pm_ipi_send_sync(primary_proc, payload, NULL, 0);
-
-	/* If action fails due to the lack of permissions filter the error */
-	if (status == PM_RET_ERROR_ACCESS)
-		status = PM_RET_SUCCESS;
-
-	return status;
+	return pm_ipi_send_sync(primary_proc, payload, NULL, 0);
 }
 
 /**
@@ -1254,10 +1229,13 @@ static enum pm_ret_status pm_pinctrl_get_num_function_groups(unsigned int fid,
  *
  * This function is used by master to get name of function specified
  * by given function Id
+ *
+ * Return: Returns status, either success or error+reason.
  */
-static void pm_pinctrl_get_function_name(unsigned int fid, char *name)
+static enum pm_ret_status pm_pinctrl_get_function_name(unsigned int fid,
+						       char *name)
 {
-	pm_api_pinctrl_get_function_name(fid, name);
+	return pm_api_pinctrl_get_function_name(fid, name);
 }
 
 /**
@@ -1317,58 +1295,78 @@ static enum pm_ret_status pm_pinctrl_get_pin_groups(unsigned int pin_id,
  * @data	Returned output data
  *
  * This function returns requested data.
+ *
+ * @return	Returns status, either success or error+reason
  */
-void pm_query_data(enum pm_query_id qid, unsigned int arg1, unsigned int arg2,
-		   unsigned int arg3, unsigned int *data)
+enum pm_ret_status pm_query_data(enum pm_query_id qid,
+				 unsigned int arg1,
+				 unsigned int arg2,
+				 unsigned int arg3,
+				 unsigned int *data)
 {
+	enum pm_ret_status ret;
+
 	switch (qid) {
 	case PM_QID_CLOCK_GET_NAME:
-		pm_clock_get_name(arg1, (char *)data);
+		ret = pm_clock_get_name(arg1, (char *)data);
 		break;
 	case PM_QID_CLOCK_GET_TOPOLOGY:
-		data[0] = pm_clock_get_topology(arg1, arg2, &data[1]);
+		ret = pm_clock_get_topology(arg1, arg2, &data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS:
-		data[0] = pm_clock_get_fixedfactor_params(arg1, &data[1],
-							  &data[2]);
+		ret = pm_clock_get_fixedfactor_params(arg1, &data[1], &data[2]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_CLOCK_GET_PARENTS:
-		data[0] = pm_clock_get_parents(arg1, arg2, &data[1]);
+		ret = pm_clock_get_parents(arg1, arg2, &data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_CLOCK_GET_ATTRIBUTES:
-		data[0] = pm_clock_get_attributes(arg1, &data[1]);
+		ret = pm_clock_get_attributes(arg1, &data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_PINCTRL_GET_NUM_PINS:
-		data[0] = pm_pinctrl_get_num_pins(&data[1]);
+		ret = pm_pinctrl_get_num_pins(&data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_PINCTRL_GET_NUM_FUNCTIONS:
-		data[0] = pm_pinctrl_get_num_functions(&data[1]);
+		ret = pm_pinctrl_get_num_functions(&data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_PINCTRL_GET_NUM_FUNCTION_GROUPS:
-		data[0] = pm_pinctrl_get_num_function_groups(arg1, &data[1]);
+		ret = pm_pinctrl_get_num_function_groups(arg1, &data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_PINCTRL_GET_FUNCTION_NAME:
-		pm_pinctrl_get_function_name(arg1, (char *)data);
+		ret = pm_pinctrl_get_function_name(arg1, (char *)data);
 		break;
 	case PM_QID_PINCTRL_GET_FUNCTION_GROUPS:
-		data[0] = pm_pinctrl_get_function_groups(arg1, arg2,
-							 (uint16_t *)&data[1]);
+		ret = pm_pinctrl_get_function_groups(arg1, arg2,
+						     (uint16_t *)&data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_PINCTRL_GET_PIN_GROUPS:
-		data[0] = pm_pinctrl_get_pin_groups(arg1, arg2,
-						    (uint16_t *)&data[1]);
+		ret = pm_pinctrl_get_pin_groups(arg1, arg2,
+						(uint16_t *)&data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	case PM_QID_CLOCK_GET_NUM_CLOCKS:
-		data[0] = pm_clock_get_num_clocks(&data[1]);
+		ret = pm_clock_get_num_clocks(&data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 
 	case PM_QID_CLOCK_GET_MAX_DIVISOR:
-		data[0] = pm_clock_get_max_divisor(arg1, arg2, &data[1]);
+		ret = pm_clock_get_max_divisor(arg1, arg2, &data[1]);
+		data[0] = (unsigned int)ret;
 		break;
 	default:
-		data[0] = PM_RET_ERROR_ARGS;
+		ret = PM_RET_ERROR_ARGS;
 		WARN("Unimplemented query service call: 0x%x\n", qid);
+		break;
 	}
+
+	return ret;
 }
 
 enum pm_ret_status pm_sha_hash(uint32_t address_high,
@@ -1549,102 +1547,4 @@ enum pm_ret_status pm_pll_get_mode(enum pm_node_id nid, enum pm_pll_mode *mode)
 	/* Send request to the PMU */
 	PM_PACK_PAYLOAD2(payload, PM_PLL_GET_MODE, nid);
 	return pm_ipi_send_sync(primary_proc, payload, mode, 1);
-}
-
-/**
- * pm_register_access() -  PM API for register read/write access data
- *
- * @register_access_id	Register_access_id which says register read/write
- *
- * @address		Address of the register to be accessed
- *
- * @mask		Mask value to be used while writing value
- *
- * @value		Value to be written to register
- *
- * @out			Returned output data
- *
- * This function returns requested data.
- *
- * @return	Returns status, either success or error+reason
- */
-enum pm_ret_status pm_register_access(unsigned int register_access_id,
-				      unsigned int address,
-				      unsigned int mask,
-				      unsigned int value,
-				      unsigned int *out)
-{
-	enum pm_ret_status ret;
-
-	if (((ZYNQMP_CSU_BASEADDR & address) != ZYNQMP_CSU_BASEADDR) &&
-			((CSUDMA_BASE & address) != CSUDMA_BASE) &&
-			((RSA_CORE_BASE & address) != RSA_CORE_BASE) &&
-			((PMU_GLOBAL_BASE & address) != PMU_GLOBAL_BASE))
-		return PM_RET_ERROR_ACCESS;
-
-	switch (register_access_id) {
-	case CONFIG_REG_WRITE:
-		ret = pm_mmio_write(address, mask, value);
-		break;
-	case CONFIG_REG_READ:
-		ret = pm_mmio_read(address, out);
-		break;
-	default:
-		ret = PM_RET_ERROR_ARGS;
-		WARN("Unimplemented register_access call\n\r");
-	}
-	return ret;
-}
-
-/**
- * pm_efuse_access() - To program or read efuse bits.
- *
- * This function provides access to the xilskey library to program/read
- * efuse bits.
- *
- * address_low: lower 32-bit Linear memory space address
- * address_high: higher 32-bit Linear memory space address
- *
- * value: Returned output value
- *
- * @return  Returns status, either success or error+reason
- *
- */
-enum pm_ret_status pm_efuse_access(uint32_t address_high,
-				   uint32_t address_low,
-				   uint32_t *value)
-{
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	PM_PACK_PAYLOAD3(payload, PM_EFUSE_ACCESS, address_high, address_low);
-
-	return pm_ipi_send_sync(primary_proc, payload, value, 1);
-}
-
-enum pm_ret_status em_set_action(unsigned int *value)
-{
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	EM_PACK_PAYLOAD1(payload, EM_SET_ACTION);
-	return pm_ipi_send_sync(primary_proc, payload, value, 1);
-}
-
-enum pm_ret_status em_remove_action(unsigned int *value)
-{
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	EM_PACK_PAYLOAD1(payload, EM_REMOVE_ACTION);
-	return pm_ipi_send_sync(primary_proc, payload, value, 1);
-}
-
-enum pm_ret_status em_send_errors(unsigned int *value)
-{
-	uint32_t payload[PAYLOAD_ARG_CNT];
-
-	/* Send request to the PMU */
-	EM_PACK_PAYLOAD1(payload, EM_SEND_ERRORS);
-	return pm_ipi_send_sync(primary_proc, payload, value, 1);
 }

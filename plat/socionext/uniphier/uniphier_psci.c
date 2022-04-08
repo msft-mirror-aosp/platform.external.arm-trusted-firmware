@@ -1,10 +1,8 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <assert.h>
 
 #include <arch_helpers.h>
 #include <common/debug.h>
@@ -14,17 +12,14 @@
 
 #include "uniphier.h"
 
-#define UNIPHIER_ROM_RSV0		0x0
+#define UNIPHIER_ROM_RSV0		0x59801200
 
-#define UNIPHIER_SLFRSTSEL		0x10
+#define UNIPHIER_SLFRSTSEL		0x61843010
 #define   UNIPHIER_SLFRSTSEL_MASK		GENMASK(1, 0)
-#define UNIPHIER_SLFRSTCTL		0x14
+#define UNIPHIER_SLFRSTCTL		0x61843014
 #define   UNIPHIER_SLFRSTCTL_RST		BIT(0)
 
 #define MPIDR_AFFINITY_INVALID		((u_register_t)-1)
-
-static uintptr_t uniphier_rom_rsv_base;
-static uintptr_t uniphier_slfrst_base;
 
 uintptr_t uniphier_sec_entrypoint;
 
@@ -39,7 +34,7 @@ static int uniphier_psci_pwr_domain_on(u_register_t mpidr)
 	flush_dcache_range((uint64_t)&uniphier_holding_pen_release,
 			   sizeof(uniphier_holding_pen_release));
 
-	mmio_write_64(uniphier_rom_rsv_base + UNIPHIER_ROM_RSV0,
+	mmio_write_64(UNIPHIER_ROM_RSV0,
 		      (uint64_t)&uniphier_warmboot_entrypoint);
 	sev();
 
@@ -76,10 +71,8 @@ static void __dead2 uniphier_psci_pwr_domain_pwr_down_wfi(
 
 static void uniphier_self_system_reset(void)
 {
-	mmio_clrbits_32(uniphier_slfrst_base + UNIPHIER_SLFRSTSEL,
-			UNIPHIER_SLFRSTSEL_MASK);
-	mmio_setbits_32(uniphier_slfrst_base + UNIPHIER_SLFRSTCTL,
-			UNIPHIER_SLFRSTCTL_RST);
+	mmio_clrbits_32(UNIPHIER_SLFRSTSEL, UNIPHIER_SLFRSTSEL_MASK);
+	mmio_setbits_32(UNIPHIER_SLFRSTCTL, UNIPHIER_SLFRSTCTL_RST);
 }
 
 static void __dead2 uniphier_psci_system_off(void)
@@ -121,40 +114,13 @@ static const struct plat_psci_ops uniphier_psci_ops = {
 int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 			const struct plat_psci_ops **psci_ops)
 {
-	uniphier_sec_entrypoint = sec_entrypoint;
-	flush_dcache_range((uint64_t)&uniphier_sec_entrypoint,
-			   sizeof(uniphier_sec_entrypoint));
+	unsigned int soc;
 
-	*psci_ops = &uniphier_psci_ops;
-
-	return 0;
-}
-
-struct uniphier_psci_ctrl_base {
-	uintptr_t rom_rsv_base;
-	uintptr_t slfrst_base;
-};
-
-static const struct uniphier_psci_ctrl_base uniphier_psci_ctrl_base[] = {
-	[UNIPHIER_SOC_LD11] = {
-		.rom_rsv_base = 0x59801200,
-		.slfrst_base = 0x61843000,
-	},
-	[UNIPHIER_SOC_LD20] = {
-		.rom_rsv_base = 0x59801200,
-		.slfrst_base = 0x61843000,
-	},
-	[UNIPHIER_SOC_PXS3] = {
-		.rom_rsv_base = 0x59801200,
-		.slfrst_base = 0x61843000,
-	},
-};
-
-void uniphier_psci_init(unsigned int soc)
-{
-	assert(soc < ARRAY_SIZE(uniphier_psci_ctrl_base));
-	uniphier_rom_rsv_base = uniphier_psci_ctrl_base[soc].rom_rsv_base;
-	uniphier_slfrst_base = uniphier_psci_ctrl_base[soc].slfrst_base;
+	soc = uniphier_get_soc_id();
+	if (soc == UNIPHIER_SOC_UNKNOWN) {
+		ERROR("unsupported SoC\n");
+		return -ENOTSUP;
+	}
 
 	if (uniphier_get_boot_master(soc) == UNIPHIER_BOOT_MASTER_SCP) {
 		uniphier_psci_scp_mode = uniphier_scp_is_running();
@@ -164,4 +130,12 @@ void uniphier_psci_init(unsigned int soc)
 		if (uniphier_psci_scp_mode)
 			uniphier_scp_open_com();
 	}
+
+	uniphier_sec_entrypoint = sec_entrypoint;
+	flush_dcache_range((uint64_t)&uniphier_sec_entrypoint,
+			   sizeof(uniphier_sec_entrypoint));
+
+	*psci_ops = &uniphier_psci_ops;
+
+	return 0;
 }

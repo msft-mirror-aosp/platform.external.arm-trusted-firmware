@@ -60,7 +60,7 @@ supporting tools:
 
 The following libraries are required for Trusted Board Boot support:
 
-- mbed TLS == 2.24.0 (tag: ``mbedtls-2.24.0``)
+- mbed TLS == 2.16.2 (tag: ``mbedtls-2.16.2``)
 
 These tools are optional:
 

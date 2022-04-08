@@ -42,11 +42,6 @@
 			define_psci_cap(PSCI_SYSTEM_RESET2_AARCH64) |	\
 			define_psci_cap(PSCI_MEM_CHK_RANGE_AARCH64))
 
-/* Internally PSCI uses a uint16_t for various cpu indexes so
- * define a limit to number of CPUs that can be initialised.
- */
-#define PSCI_MAX_CPUS_INDEX	0xFFFFU
-
 /*
  * Helper functions to get/set the fields of PSCI per-cpu data.
  */
@@ -139,7 +134,7 @@ typedef struct non_cpu_pwr_domain_node {
 	unsigned char level;
 
 	/* For indexing the psci_lock array*/
-	uint16_t lock_index;
+	unsigned char lock_index;
 } non_cpu_pd_node_t;
 
 typedef struct cpu_pwr_domain_node {
@@ -244,7 +239,7 @@ static inline void psci_lock_release(non_cpu_pd_node_t *non_cpu_pd_node)
 #endif /* HW_ASSISTED_COHERENCY */
 
 static inline void psci_lock_init(non_cpu_pd_node_t *non_cpu_pd_node,
-				  uint16_t idx)
+				  unsigned char idx)
 {
 	non_cpu_pd_node[idx].lock_index = idx;
 }

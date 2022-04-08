@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -120,22 +120,18 @@ void plat_arm_io_setup(void)
 {
 	int io_result;
 
-	io_result = arm_io_setup();
-	if (io_result < 0) {
-		panic();
-	}
+	arm_io_setup();
 
 	/* Register the additional IO devices on this platform */
 	io_result = register_io_dev_sh(&sh_dev_con);
-	if (io_result < 0) {
-		panic();
-	}
+	assert(io_result == 0);
 
 	/* Open connections to devices and cache the handles */
 	io_result = io_dev_open(sh_dev_con, (uintptr_t)NULL, &sh_dev_handle);
-	if (io_result < 0) {
-		panic();
-	}
+	assert(io_result == 0);
+
+	/* Ignore improbable errors in release builds */
+	(void)io_result;
 }
 
 /*

@@ -9,12 +9,14 @@
 
 #include <drivers/console.h>
 
-#define CONSOLE_T_CBMC_SIZE	CONSOLE_T_DRVDATA
+#define CONSOLE_T_CBMC_BASE	CONSOLE_T_DRVDATA
+#define CONSOLE_T_CBMC_SIZE	(CONSOLE_T_DRVDATA + REGSZ)
 
 #ifndef __ASSEMBLER__
 
 typedef struct {
 	console_t console;
+	uintptr_t base;
 	uint32_t size;
 } console_cbmc_t;
 

@@ -7,7 +7,7 @@ of this file will be moved to the collective change-log.rst file at the time of
 release code freeze.
 
 
-Upcoming Release Version 2.4
+Upcoming Release Version 2.3
 ----------------------------
 
 **Trusted Firmware-A Contributors,
@@ -22,12 +22,8 @@ New Features
 - Arm Architecture
    - Example: "Add support for Branch Target Identification (BTI)"
 
-- BL-specific
-   - Example: "Enhanced BL2 bootloader flow to load secure partitions based
-     on firmware configuration data (fconf)."
-
 - Build System
-   - Example: "Modify FVP makefile for CPUs that support both AArch64/32"
+   - Add support for documentation build as a target in Makefile
 
 - CPU Support
    - Example: "cortex-a55: Workaround for erratum 1221012"

@@ -18,8 +18,6 @@
 #include "pm_ipi.h"
 
 
-#define ERROR_CODE_MASK		0xFFFFU
-
 DEFINE_BAKERY_LOCK(pm_secure_lock);
 
 /**
@@ -232,7 +230,7 @@ enum pm_ret_status pm_ipi_send_sync(const struct pm_proc *proc,
 	if (ret != PM_RET_SUCCESS)
 		goto unlock;
 
-	ret = ERROR_CODE_MASK & (pm_ipi_buff_read(proc, value, count));
+	ret = pm_ipi_buff_read(proc, value, count);
 
 unlock:
 	bakery_lock_release(&pm_secure_lock);

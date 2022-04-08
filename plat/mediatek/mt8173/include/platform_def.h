@@ -51,8 +51,6 @@
 					 PLATFORM_CLUSTER_COUNT +	\
 					 PLATFORM_CORE_COUNT)
 
-#define SOC_CHIP_ID                     U(0x8173)
-
 /*******************************************************************************
  * Platform memory map related constants
  ******************************************************************************/

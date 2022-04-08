@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -51,7 +51,7 @@ static void scpi_secure_message_send(size_t payload_size)
 	mhu_secure_message_send(SCPI_MHU_SLOT_ID);
 }
 
-static int scpi_secure_message_receive(scpi_cmd_t *cmd)
+static void scpi_secure_message_receive(scpi_cmd_t *cmd)
 {
 	uint32_t mhu_status;
 
@@ -63,7 +63,7 @@ static int scpi_secure_message_receive(scpi_cmd_t *cmd)
 	if (mhu_status != (1 << SCPI_MHU_SLOT_ID)) {
 		ERROR("MHU: Unexpected protocol (MHU status: 0x%x)\n",
 			mhu_status);
-		return -1;
+		panic();
 	}
 
 	/*
@@ -74,8 +74,6 @@ static int scpi_secure_message_receive(scpi_cmd_t *cmd)
 	dmbld();
 
 	memcpy(cmd, (void *) SCPI_SHARED_MEM_SCP_TO_AP, sizeof(*cmd));
-
-	return 0;
 }
 
 static void scpi_secure_message_end(void)
@@ -86,18 +84,13 @@ static void scpi_secure_message_end(void)
 int scpi_wait_ready(void)
 {
 	scpi_cmd_t scpi_cmd;
-	int rc;
 
 	VERBOSE("Waiting for SCP_READY command...\n");
 
 	/* Get a message from the SCP */
 	scpi_secure_message_start();
-	rc = scpi_secure_message_receive(&scpi_cmd);
+	scpi_secure_message_receive(&scpi_cmd);
 	scpi_secure_message_end();
-
-	/* If no message was received, don't send a response */
-	if (rc != 0)
-		return rc;
 
 	/* We are expecting 'SCP Ready', produce correct error if it's not */
 	scpi_status_t status = SCP_OK;
@@ -216,8 +209,7 @@ int scpi_get_css_power_state(unsigned int mpidr, unsigned int *cpu_state_p,
 	 * Send message and wait for SCP's response
 	 */
 	scpi_secure_message_send(0);
-	if (scpi_secure_message_receive(&response) != 0)
-		goto exit;
+	scpi_secure_message_receive(&response);
 
 	if (response.status != SCP_OK)
 		goto exit;
@@ -262,9 +254,7 @@ uint32_t scpi_sys_power_state(scpi_system_state_t system_state)
 	*payload_addr = system_state & 0xff;
 	scpi_secure_message_send(sizeof(*payload_addr));
 
-	/* If no response is received, fill in an error status */
-	if (scpi_secure_message_receive(&response) != 0)
-		response.status = SCP_E_TIMEOUT;
+	scpi_secure_message_receive(&response);
 
 	scpi_secure_message_end();
 

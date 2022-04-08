@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,15 +14,30 @@
 #include "socfpga_reset_manager.h"
 #include "socfpga_sip_svc.h"
 
+/* Number of SiP Calls implemented */
+#define SIP_NUM_CALLS		0x3
 
 /* Total buffer the driver can hold */
 #define FPGA_CONFIG_BUFFER_SIZE 4
 
-static int current_block, current_buffer;
-static int read_block, max_blocks, is_partial_reconfig;
-static uint32_t send_id, rcv_id;
-static uint32_t bytes_per_block, blocks_submitted;
+static int current_block;
+static int read_block;
+static int current_buffer;
+static int send_id;
+static int rcv_id;
+static int max_blocks;
+static uint32_t bytes_per_block;
+static uint32_t blocks_submitted;
+static int is_partial_reconfig;
 
+struct fpga_config_info {
+	uint32_t addr;
+	int size;
+	int size_written;
+	uint32_t write_requested;
+	int subblocks_sent;
+	int block_number;
+};
 
 /*  SiP Service UUID */
 DEFINE_SVC_UUID2(intl_svc_uid,
@@ -59,8 +74,10 @@ static int intel_fpga_sdm_write_buffer(struct fpga_config_info *buffer)
 			args[2] = bytes_per_block;
 
 		buffer->size_written += args[2];
-		mailbox_send_cmd_async(&send_id, MBOX_RECONFIG_DATA, args,
-					3U, CMD_INDIRECT);
+		mailbox_send_cmd_async(
+			send_id++ % MBOX_MAX_JOB_ID,
+			MBOX_RECONFIG_DATA,
+			args, 3, 0);
 
 		buffer->subblocks_sent++;
 		max_blocks--;
@@ -126,7 +143,7 @@ static int mark_last_buffer_xfer_completed(uint32_t *buffer_addr_completed)
 }
 
 static int intel_fpga_config_completed_write(uint32_t *completed_addr,
-					uint32_t *count, uint32_t *job_id)
+					uint32_t *count)
 {
 	uint32_t status = INTEL_SIP_SMC_STATUS_OK;
 	*count = 0;
@@ -136,13 +153,14 @@ static int intel_fpga_config_completed_write(uint32_t *completed_addr,
 
 	while (*count < 3) {
 
-		resp_len = mailbox_read_response(job_id,
-				resp, ARRAY_SIZE(resp));
+		resp_len = mailbox_read_response(rcv_id % MBOX_MAX_JOB_ID,
+				resp, sizeof(resp) / sizeof(resp[0]));
 
 		if (resp_len < 0)
 			break;
 
 		max_blocks++;
+		rcv_id++;
 
 		if (mark_last_buffer_xfer_completed(
 			&completed_addr[*count]) == 0)
@@ -190,10 +208,10 @@ static int intel_fpga_config_start(uint32_t config_type)
 
 	mailbox_clear_response();
 
-	mailbox_send_cmd(1U, MBOX_CMD_CANCEL, NULL, 0U, CMD_CASUAL, NULL, 0U);
+	mailbox_send_cmd(1, MBOX_CMD_CANCEL, 0, 0, 0, NULL, 0);
 
-	status = mailbox_send_cmd(1U, MBOX_RECONFIG, NULL, 0U, CMD_CASUAL,
-			response, ARRAY_SIZE(response));
+	status = mailbox_send_cmd(1, MBOX_RECONFIG, 0, 0, 0,
+			response, sizeof(response) / sizeof(response[0]));
 
 	if (status < 0)
 		return status;
@@ -214,6 +232,8 @@ static int intel_fpga_config_start(uint32_t config_type)
 	current_block = 0;
 	read_block = 0;
 	current_buffer = 0;
+	send_id = 0;
+	rcv_id = 0;
 
 	/* full reconfiguration */
 	if (!is_partial_reconfig) {
@@ -232,16 +252,12 @@ static bool is_fpga_config_buffer_full(void)
 	return true;
 }
 
-bool is_address_in_ddr_range(uint64_t addr, uint64_t size)
+static bool is_address_in_ddr_range(uint64_t addr)
 {
-	if (size > (UINT64_MAX - addr))
-		return false;
-	if (addr < BL31_LIMIT)
-		return false;
-	if (addr + size > DRAM_BASE + DRAM_SIZE)
-		return false;
+	if (addr >= DRAM_BASE && addr <= DRAM_BASE + DRAM_SIZE)
+		return true;
 
-	return true;
+	return false;
 }
 
 static uint32_t intel_fpga_config_write(uint64_t mem, uint64_t size)
@@ -250,7 +266,8 @@ static uint32_t intel_fpga_config_write(uint64_t mem, uint64_t size)
 
 	intel_fpga_sdm_write_all();
 
-	if (!is_address_in_ddr_range(mem, size) ||
+	if (!is_address_in_ddr_range(mem) ||
+		!is_address_in_ddr_range(mem + size) ||
 		is_fpga_config_buffer_full())
 		return INTEL_SIP_SMC_STATUS_REJECTED;
 
@@ -348,66 +365,6 @@ uint32_t intel_secure_reg_update(uint64_t reg_addr, uint32_t mask,
 	return INTEL_SIP_SMC_STATUS_ERROR;
 }
 
-/* Intel Remote System Update (RSU) services */
-uint64_t intel_rsu_update_address;
-
-static uint32_t intel_rsu_status(uint64_t *respbuf, unsigned int respbuf_sz)
-{
-	if (mailbox_rsu_status((uint32_t *)respbuf, respbuf_sz) < 0)
-		return INTEL_SIP_SMC_RSU_ERROR;
-
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
-static uint32_t intel_rsu_update(uint64_t update_address)
-{
-	intel_rsu_update_address = update_address;
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
-static uint32_t intel_rsu_notify(uint32_t execution_stage)
-{
-	if (mailbox_hps_stage_notify(execution_stage) < 0)
-		return INTEL_SIP_SMC_RSU_ERROR;
-
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
-static uint32_t intel_rsu_retry_counter(uint32_t *respbuf, uint32_t respbuf_sz,
-					uint32_t *ret_stat)
-{
-	if (mailbox_rsu_status((uint32_t *)respbuf, respbuf_sz) < 0)
-		return INTEL_SIP_SMC_RSU_ERROR;
-
-	*ret_stat = respbuf[8];
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
-/* Mailbox services */
-static uint32_t intel_mbox_send_cmd(uint32_t cmd, uint32_t *args, uint32_t len,
-				    uint32_t urgent, uint32_t *response,
-				    uint32_t resp_len, int *mbox_status,
-				    int *len_in_resp)
-{
-	*len_in_resp = 0;
-	*mbox_status = 0;
-
-	if (!is_address_in_ddr_range((uint64_t)args, sizeof(uint32_t) * len))
-		return INTEL_SIP_SMC_STATUS_REJECTED;
-
-	int status = mailbox_send_cmd(MBOX_JOB_ID, cmd, args, len, urgent,
-				      response, resp_len);
-
-	if (status < 0) {
-		*mbox_status = -status;
-		return INTEL_SIP_SMC_STATUS_ERROR;
-	}
-
-	*mbox_status = 0;
-	*len_in_resp = status;
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
 /*
  * This function is responsible for handling all SiP calls from the NS world
  */
@@ -421,13 +378,10 @@ uintptr_t sip_smc_handler(uint32_t smc_fid,
 			 void *handle,
 			 u_register_t flags)
 {
-	uint32_t retval = 0;
+	uint32_t val = 0;
 	uint32_t status = INTEL_SIP_SMC_STATUS_OK;
 	uint32_t completed_addr[3];
-	uint64_t rsu_respbuf[9];
-	u_register_t x5, x6;
-	int mbox_status, len_in_resp;
-
+	uint32_t count = 0;
 
 	switch (smc_fid) {
 	case SIP_SVC_UID:
@@ -454,8 +408,8 @@ uintptr_t sip_smc_handler(uint32_t smc_fid,
 
 	case INTEL_SIP_SMC_FPGA_CONFIG_COMPLETED_WRITE:
 		status = intel_fpga_config_completed_write(completed_addr,
-							&retval, &rcv_id);
-		switch (retval) {
+								&count);
+		switch (count) {
 		case 1:
 			SMC_RET4(handle, INTEL_SIP_SMC_STATUS_OK,
 				completed_addr[0], 0, 0);
@@ -480,52 +434,17 @@ uintptr_t sip_smc_handler(uint32_t smc_fid,
 		}
 
 	case INTEL_SIP_SMC_REG_READ:
-		status = intel_secure_reg_read(x1, &retval);
-		SMC_RET3(handle, status, retval, x1);
+		status = intel_secure_reg_read(x1, &val);
+		SMC_RET3(handle, status, val, x1);
 
 	case INTEL_SIP_SMC_REG_WRITE:
-		status = intel_secure_reg_write(x1, (uint32_t)x2, &retval);
-		SMC_RET3(handle, status, retval, x1);
+		status = intel_secure_reg_write(x1, (uint32_t)x2, &val);
+		SMC_RET3(handle, status, val, x1);
 
 	case INTEL_SIP_SMC_REG_UPDATE:
 		status = intel_secure_reg_update(x1, (uint32_t)x2,
-						 (uint32_t)x3, &retval);
-		SMC_RET3(handle, status, retval, x1);
-
-	case INTEL_SIP_SMC_RSU_STATUS:
-		status = intel_rsu_status(rsu_respbuf,
-					ARRAY_SIZE(rsu_respbuf));
-		if (status) {
-			SMC_RET1(handle, status);
-		} else {
-			SMC_RET4(handle, rsu_respbuf[0], rsu_respbuf[1],
-					rsu_respbuf[2], rsu_respbuf[3]);
-		}
-
-	case INTEL_SIP_SMC_RSU_UPDATE:
-		status = intel_rsu_update(x1);
-		SMC_RET1(handle, status);
-
-	case INTEL_SIP_SMC_RSU_NOTIFY:
-		status = intel_rsu_notify(x1);
-		SMC_RET1(handle, status);
-
-	case INTEL_SIP_SMC_RSU_RETRY_COUNTER:
-		status = intel_rsu_retry_counter((uint32_t *)rsu_respbuf,
-						ARRAY_SIZE(rsu_respbuf), &retval);
-		if (status) {
-			SMC_RET1(handle, status);
-		} else {
-			SMC_RET2(handle, status, retval);
-		}
-
-	case INTEL_SIP_SMC_MBOX_SEND_CMD:
-		x5 = SMC_GET_GP(handle, CTX_GPREG_X5);
-		x6 = SMC_GET_GP(handle, CTX_GPREG_X6);
-		status = intel_mbox_send_cmd(x1, (uint32_t *)x2, x3, x4,
-					     (uint32_t *)x5, x6, &mbox_status,
-					     &len_in_resp);
-		SMC_RET4(handle, status, mbox_status, x5, len_in_resp);
+						 (uint32_t)x3, &val);
+		SMC_RET3(handle, status, val, x1);
 
 	default:
 		return socfpga_sip_handler(smc_fid, x1, x2, x3, x4,

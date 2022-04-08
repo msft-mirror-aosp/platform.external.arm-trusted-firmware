@@ -1,10 +1,11 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <common/bl_common.ld.h>
+#include <platform_def.h>
+
 #include <lib/xlat_tables/xlat_tables_defs.h>
 
 OUTPUT_FORMAT(PLATFORM_LINKER_FORMAT)
@@ -45,7 +46,11 @@ SECTIONS
         __RODATA_START__ = .;
         *(SORT_BY_ALIGNMENT(.rodata*))
 
-	RODATA_COMMON
+        /* Ensure 8-byte alignment for descriptors and ensure inclusion */
+        . = ALIGN(8);
+        __PARSER_LIB_DESCS_START__ = .;
+        KEEP(*(.img_parser_lib_descs))
+        __PARSER_LIB_DESCS_END__ = .;
 
         . = ALIGN(PAGE_SIZE);
         __RODATA_END__ = .;
@@ -57,7 +62,11 @@ SECTIONS
         *(SORT_BY_ALIGNMENT(.text*))
         *(SORT_BY_ALIGNMENT(.rodata*))
 
-	RODATA_COMMON
+        /* Ensure 8-byte alignment for descriptors and ensure inclusion */
+        . = ALIGN(8);
+        __PARSER_LIB_DESCS_START__ = .;
+        KEEP(*(.img_parser_lib_descs))
+        __PARSER_LIB_DESCS_END__ = .;
 
         *(.vectors)
         __RO_END_UNALIGNED__ = .;
@@ -77,10 +86,44 @@ SECTIONS
      */
     __RW_START__ = . ;
 
-    DATA_SECTION >RAM
-    STACK_SECTION >RAM
-    BSS_SECTION >RAM
-    XLAT_TABLE_SECTION >RAM
+    /*
+     * .data must be placed at a lower address than the stacks if the stack
+     * protector is enabled. Alternatively, the .data.stack_protector_canary
+     * section can be placed independently of the main .data section.
+     */
+    .data . : {
+        __DATA_START__ = .;
+        *(SORT_BY_ALIGNMENT(.data*))
+        __DATA_END__ = .;
+    } >RAM
+
+    stacks (NOLOAD) : {
+        __STACKS_START__ = .;
+        *(tzfw_normal_stacks)
+        __STACKS_END__ = .;
+    } >RAM
+
+    /*
+     * The .bss section gets initialised to 0 at runtime.
+     * Its base address should be 16-byte aligned for better performance of the
+     * zero-initialization code.
+     */
+    .bss : ALIGN(16) {
+        __BSS_START__ = .;
+        *(SORT_BY_ALIGNMENT(.bss*))
+        *(COMMON)
+        __BSS_END__ = .;
+    } >RAM
+
+    /*
+     * The xlat_table section is for full, aligned page tables (4K).
+     * Removing them from .bss avoids forcing 4K alignment on
+     * the .bss section. The tables are initialized to zero by the translation
+     * tables library.
+     */
+    xlat_table (NOLOAD) : {
+        *(xlat_table)
+    } >RAM
 
 #if USE_COHERENT_MEM
     /*

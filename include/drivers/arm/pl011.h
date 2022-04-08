@@ -81,9 +81,16 @@
 
 #endif /* !PL011_GENERIC_UART */
 
+#define CONSOLE_T_PL011_BASE	CONSOLE_T_DRVDATA
+
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
+
+typedef struct {
+	console_t console;
+	uintptr_t base;
+} console_pl011_t;
 
 /*
  * Initialize a new PL011 console instance and register it with the console
@@ -92,7 +99,7 @@
  * Its contents will be reinitialized from scratch.
  */
 int console_pl011_register(uintptr_t baseaddr, uint32_t clock, uint32_t baud,
-			   console_t *console);
+			   console_pl011_t *console);
 
 #endif /*__ASSEMBLER__*/
 

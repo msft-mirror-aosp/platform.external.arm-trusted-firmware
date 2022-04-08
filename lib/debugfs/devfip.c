@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2021, Arm Limited. All rights reserved.
+ * Copyright (c) 2019, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -73,11 +73,8 @@ static const struct uuidnames uuidnames[] = {
 	{"soc-fw.cfg",		UUID_SOC_FW_CONFIG},
 	{"tos-fw.cfg",		UUID_TOS_FW_CONFIG},
 	{"nt-fw.cfg",		UUID_NT_FW_CONFIG},
-	{"fw.cfg",		UUID_FW_CONFIG},
 	{"rot-k.crt",		UUID_ROT_KEY_CERT},
-	{"nt-k.crt",		UUID_NON_TRUSTED_WORLD_KEY_CERT},
-	{"sip-sp.crt",		UUID_SIP_SECURE_PARTITION_CONTENT_CERT},
-	{"plat-sp.crt",		UUID_PLAT_SECURE_PARTITION_CONTENT_CERT}
+	{"nt-k.crt",		UUID_NON_TRUSTED_WORLD_KEY_CERT}
 };
 
 /*******************************************************************************
@@ -106,6 +103,10 @@ static int get_entry(chan_t *c, struct fip_entry *entry)
 		return -1;
 	}
 
+	if ((entry->size > LONG_MAX) || (entry->offset_address > LONG_MAX)) {
+		return -1;
+	}
+
 	if (entry->size == 0) {
 		return 0;
 	}
@@ -129,10 +130,7 @@ static int fipgen(chan_t *c, const dirtab_t *tab, int ntab, int n, dir_t *dir)
 		panic();
 	}
 
-	if (clone(archives[c->dev].c, &nc) == NULL) {
-		panic();
-	}
-
+	clone(archives[c->dev].c, &nc);
 	fip = &archives[nc.dev];
 
 	off = STOC_HEADER;
@@ -205,9 +203,7 @@ static int fipread(chan_t *c, void *buf, int n)
 		panic();
 	}
 
-	if (clone(fip->c, &cs) == NULL) {
-		panic();
-	}
+	clone(fip->c, &cs);
 
 	size = fip->size[c->qid];
 	if (c->offset >= size) {

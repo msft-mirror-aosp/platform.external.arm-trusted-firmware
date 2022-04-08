@@ -158,36 +158,51 @@ X509_EXTENSION *ext_new_hash(int nid, int crit, const EVP_MD *md,
 		unsigned char *buf, size_t len)
 {
 	X509_EXTENSION *ex;
+	ASN1_OCTET_STRING *octet;
 	HASH *hash;
 	ASN1_OBJECT *algorithm;
+	X509_ALGOR *x509_algor;
 	unsigned char *p = NULL;
 	int sz;
-
-	/* HASH structure containing algorithm + hash */
-	hash = HASH_new();
-	if (hash == NULL) {
-		return NULL;
-	}
 
 	/* OBJECT_IDENTIFIER with hash algorithm */
 	algorithm = OBJ_nid2obj(EVP_MD_type(md));
 	if (algorithm == NULL) {
-		HASH_free(hash);
 		return NULL;
 	}
 
 	/* Create X509_ALGOR */
-	hash->hashAlgorithm->algorithm = algorithm;
-	hash->hashAlgorithm->parameter = ASN1_TYPE_new();
-	ASN1_TYPE_set(hash->hashAlgorithm->parameter, V_ASN1_NULL, NULL);
+	x509_algor = X509_ALGOR_new();
+	if (x509_algor == NULL) {
+		return NULL;
+	}
+	x509_algor->algorithm = algorithm;
+	x509_algor->parameter = ASN1_TYPE_new();
+	ASN1_TYPE_set(x509_algor->parameter, V_ASN1_NULL, NULL);
 
 	/* OCTET_STRING with the actual hash */
-	ASN1_OCTET_STRING_set(hash->dataHash, buf, len);
+	octet = ASN1_OCTET_STRING_new();
+	if (octet == NULL) {
+		X509_ALGOR_free(x509_algor);
+		return NULL;
+	}
+	ASN1_OCTET_STRING_set(octet, buf, len);
+
+	/* HASH structure containing algorithm + hash */
+	hash = HASH_new();
+	if (hash == NULL) {
+		ASN1_OCTET_STRING_free(octet);
+		X509_ALGOR_free(x509_algor);
+		return NULL;
+	}
+	hash->hashAlgorithm = x509_algor;
+	hash->dataHash = octet;
 
 	/* DER encoded HASH */
 	sz = i2d_HASH(hash, &p);
 	if ((sz <= 0) || (p == NULL)) {
 		HASH_free(hash);
+		X509_ALGOR_free(x509_algor);
 		return NULL;
 	}
 

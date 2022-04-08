@@ -25,8 +25,7 @@ unsigned int uniphier_get_boot_device(unsigned int soc);
 #define UNIPHIER_BOOT_DEVICE_EMMC	0
 #define UNIPHIER_BOOT_DEVICE_NAND	1
 #define UNIPHIER_BOOT_DEVICE_NOR	2
-#define UNIPHIER_BOOT_DEVICE_SD		3
-#define UNIPHIER_BOOT_DEVICE_USB	4
+#define UNIPHIER_BOOT_DEVICE_USB	3
 #define UNIPHIER_BOOT_DEVICE_RSV	0xffffffff
 
 unsigned int uniphier_get_boot_master(unsigned int soc);
@@ -35,13 +34,11 @@ unsigned int uniphier_get_boot_master(unsigned int soc);
 #define UNIPHIER_BOOT_MASTER_SCP	1
 #define UNIPHIER_BOOT_MASTER_EXT	2
 
-void uniphier_console_setup(unsigned int soc);
+void uniphier_console_setup(void);
 
 struct io_block_dev_spec;
-int uniphier_emmc_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec);
-int uniphier_nand_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec);
+int uniphier_emmc_init(struct io_block_dev_spec **block_dev_spec);
+int uniphier_nand_init(struct io_block_dev_spec **block_dev_spec);
 int uniphier_usb_init(unsigned int soc,
 		      struct io_block_dev_spec **block_dev_spec);
 
@@ -57,7 +54,7 @@ void uniphier_scp_open_com(void);
 void uniphier_scp_system_off(void);
 void uniphier_scp_system_reset(void);
 
-void uniphier_mmap_setup(unsigned int soc);
+void uniphier_mmap_setup(void);
 
 void uniphier_cci_init(unsigned int soc);
 void uniphier_cci_enable(void);
@@ -68,8 +65,6 @@ void uniphier_gic_init(void);
 void uniphier_gic_cpuif_enable(void);
 void uniphier_gic_cpuif_disable(void);
 void uniphier_gic_pcpu_init(void);
-
-void uniphier_psci_init(unsigned int soc);
 
 unsigned int uniphier_calc_core_pos(u_register_t mpidr);
 

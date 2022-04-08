@@ -12,7 +12,7 @@
 
 #define TEGRA194_STATE_SYSTEM_SUSPEND	0x5C7
 #define TEGRA194_STATE_SYSTEM_RESUME	0x600D
-#define TEGRA194_MC_CTX_SIZE		0xFB
+#define TEGRA194_SMMU_CTX_SIZE		0x80D
 
 	.align 4
 	.globl	tegra194_cpu_reset_handler
@@ -58,13 +58,6 @@ m_loop1:
 	subs	x2, x2, #1
 	b.ne	m_loop1
 
-	/*
-	 * Synchronization barriers to make sure that memory is flushed out
-	 * before we start execution in SysRAM.
-	 */
-	dsb	sy
-	isb
-
 boot_cpu:
 	adr	x0, __tegra194_cpu_reset_handler_data
 	ldr	x0, [x0]
@@ -76,8 +69,8 @@ endfunc tegra194_cpu_reset_handler
 	 *
 	 * 0x0000: secure world's entrypoint
 	 * 0x0008: BL31 size (RO + RW)
-	 * 0x0010: MC context start
-	 * 0x2490: MC context end
+	 * 0x0010: SMMU context start
+	 * 0x2490: SMMU context end
 	 */
 
 	.align 4
@@ -86,13 +79,14 @@ endfunc tegra194_cpu_reset_handler
 __tegra194_cpu_reset_handler_data:
 	.quad	tegra_secure_entrypoint
 	.quad	__BL31_END__ - BL31_BASE
+
 	.globl	__tegra194_system_suspend_state
 __tegra194_system_suspend_state:
 	.quad	0
 
 	.align 4
-__tegra194_mc_context:
-	.rept	TEGRA194_MC_CTX_SIZE
+__tegra194_smmu_context:
+	.rept	TEGRA194_SMMU_CTX_SIZE
 	.quad	0
 	.endr
 	.size	__tegra194_cpu_reset_handler_data, \
@@ -104,7 +98,7 @@ __tegra194_cpu_reset_handler_end:
 
 	.globl tegra194_get_cpu_reset_handler_size
 	.globl tegra194_get_cpu_reset_handler_base
-	.globl tegra194_get_mc_ctx_offset
+	.globl tegra194_get_smmu_ctx_offset
 	.globl tegra194_set_system_suspend_entry
 
 /* return size of the CPU reset handler */
@@ -121,13 +115,13 @@ func tegra194_get_cpu_reset_handler_base
 	ret
 endfunc tegra194_get_cpu_reset_handler_base
 
-/* return the size of the MC context */
-func tegra194_get_mc_ctx_offset
-	adr	x0, __tegra194_mc_context
+/* return the size of the SMMU context */
+func tegra194_get_smmu_ctx_offset
+	adr	x0, __tegra194_smmu_context
 	adr	x1, tegra194_cpu_reset_handler
 	sub	x0, x0, x1
 	ret
-endfunc tegra194_get_mc_ctx_offset
+endfunc tegra194_get_smmu_ctx_offset
 
 /* set system suspend state before SC7 entry */
 func tegra194_set_system_suspend_entry

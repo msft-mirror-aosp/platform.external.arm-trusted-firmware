@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2018-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -113,7 +113,6 @@
 					 SDMMC_STAR_IDMATE   | \
 					 SDMMC_STAR_IDMABTC)
 
-#define TIMEOUT_US_1_MS			1000U
 #define TIMEOUT_US_10_MS		10000U
 #define TIMEOUT_US_1_S			1000000U
 
@@ -258,18 +257,6 @@ static int stm32_sdmmc2_send_cmd_req(struct mmc_cmd *cmd)
 		break;
 	}
 
-	mmio_write_32(base + SDMMC_ICR, SDMMC_STATIC_FLAGS);
-
-	/*
-	 * Clear the SDMMC_DCTRLR if the command does not await data.
-	 * Skip CMD55 as the next command could be data related, and
-	 * the register could have been set in prepare function.
-	 */
-	if (((cmd_reg & SDMMC_CMDR_CMDTRANS) == 0U) &&
-	    (cmd->cmd_idx != MMC_CMD(55))) {
-		mmio_write_32(base + SDMMC_DCTRLR, 0U);
-	}
-
 	if ((cmd->resp_type & MMC_RSP_BUSY) != 0U) {
 		mmio_write_32(base + SDMMC_DTIMER, UINT32_MAX);
 	}
@@ -385,15 +372,15 @@ err_exit:
 
 static int stm32_sdmmc2_send_cmd(struct mmc_cmd *cmd)
 {
-	uint8_t retry;
-	int err;
+	int8_t retry;
+	int err = 0;
 
 	assert(cmd != NULL);
 
-	for (retry = 0U; retry < 3U; retry++) {
+	for (retry = 0; retry <= 3; retry++) {
 		err = stm32_sdmmc2_send_cmd_req(cmd);
 		if (err == 0) {
-			return 0;
+			return err;
 		}
 
 		if ((cmd->cmd_idx == MMC_CMD(1)) ||
@@ -402,12 +389,12 @@ static int stm32_sdmmc2_send_cmd(struct mmc_cmd *cmd)
 		}
 
 		/* Command 8 is expected to fail for eMMC */
-		if (cmd->cmd_idx != MMC_CMD(8)) {
-			WARN(" CMD%u, Retry: %u, Error: %d\n",
-			     cmd->cmd_idx, retry + 1U, err);
+		if (!(cmd->cmd_idx == MMC_CMD(8))) {
+			WARN(" CMD%d, Retry: %d, Error: %d\n",
+			     cmd->cmd_idx, retry, err);
 		}
 
-		udelay(10U);
+		udelay(10);
 	}
 
 	return err;
@@ -724,8 +711,6 @@ unsigned long long stm32_sdmmc2_mmc_get_device_size(void)
 
 int stm32_sdmmc2_mmc_init(struct stm32_sdmmc2_params *params)
 {
-	int rc;
-
 	assert((params != NULL) &&
 	       ((params->reg_base & MMC_BLOCK_MASK) == 0U) &&
 	       ((params->bus_width == MMC_BUS_WIDTH_1) ||
@@ -741,15 +726,9 @@ int stm32_sdmmc2_mmc_init(struct stm32_sdmmc2_params *params)
 
 	stm32mp_clk_enable(sdmmc2_params.clock_id);
 
-	rc = stm32mp_reset_assert(sdmmc2_params.reset_id, TIMEOUT_US_1_MS);
-	if (rc != 0) {
-		panic();
-	}
+	stm32mp_reset_assert(sdmmc2_params.reset_id);
 	udelay(2);
-	rc = stm32mp_reset_deassert(sdmmc2_params.reset_id, TIMEOUT_US_1_MS);
-	if (rc != 0) {
-		panic();
-	}
+	stm32mp_reset_deassert(sdmmc2_params.reset_id);
 	mdelay(1);
 
 	sdmmc2_params.clk_rate = stm32mp_clk_get_rate(sdmmc2_params.clock_id);

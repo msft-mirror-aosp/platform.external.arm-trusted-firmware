@@ -13,6 +13,5 @@
 void ap_init(void);
 void ap_ble_init(void);
 int ap_get_count(void);
-void update_cp110_default_win(int cp_id);
 
 #endif /* AP_SETUP_H */

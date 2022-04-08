@@ -7,6 +7,6 @@
 #ifndef JUNO_DECL_H
 #define JUNO_DECL_H
 
-bool juno_getentropy(uint64_t *buf);
+int juno_getentropy(void *buf, size_t len);
 
 #endif /* JUNO_DECL_H */
